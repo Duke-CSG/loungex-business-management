@@ -88,14 +88,13 @@ function openStore(name) {
     var p = (val / c.mRev) * 100;
     if (p <= 0) return "";
     return '<div class="ws" style="width:' + p.toFixed(2) + "%;background:" + color +
-      (dark ? ";color:#fff" : ";color:#1A1A1A") + '" title="' + esc(label) + " " + won(val) + '">' +
-      (p >= 11 ? '<span class="ws-n">' + esc(label) + "</span><span class=\"ws-v\">" +
-        p.toFixed(0) + "%</span>" : "") + "</div>";
+      (dark ? ";color:#fff" : ";color:#1A1A1A") + '">' +
+      (p >= 11 ? '<span class="ws-n">' + esc(label) + " " + p.toFixed(0) + "%</span>" +
+        (p >= 20 ? '<span class="ws-v">' + won(val) + "</span>" : "") : "") + "</div>";
   };
   h += '<h3 style="margin:22px 0 4px;font-size:14px;font-weight:800">원가 구조 — 월매출 ' +
     won(c.mRev) + "을 100%로 놓으면</h3>" +
-    '<p class="tiny" style="margin:0 0 10px">막대 위에 마우스를 올리면 금액이 나옵니다.</p>' +
-    '<div class="wfall">' +
+    '<div class="wfall" style="margin-top:10px">' +
     seg("변동비", vc, "#CBD0D6") +
     seg("고정비", fx, "#B03A2E", true) +
     (pf > 0 ? seg("영업이익", pf, "#1E6B4F", true) : "") +
@@ -593,9 +592,9 @@ function ebiSeries() {
   ];
 }
 function pGoalAfter() {
-  var M = LX.meta.months, n = LX.goal.ramp.notes;
-  line("rampC", rampSeries(), M, { h: 250, notes: n });
-  line("ebiC", ebiSeries(), M, { h: 250, notes: n });
+  var M = LX.meta.months, r = LX.goal.ramp;
+  line("rampC", rampSeries(), M, { h: 250, notes: r.notes });
+  line("ebiC", ebiSeries(), M, { h: 250, notes: r.ebitdaNotes });
 }
 
 /* ══ ② 세부사업영역별 현황 ═══════════════ */
@@ -720,12 +719,13 @@ function pTree() {
     "구체화될 수 없습니다. 무엇을 올릴지 모르기 때문입니다.</div>";
 
   h += '<p class="sec-d">' + esc(t.note) + "</p>";
-  h += '<div class="tree">' + t.branches.map(function (b) {
-    return '<div class="tree-b"><div class="tree-h">' + esc(b.root) + " 분해</div>" +
+  h += '<div class="grid2">' + t.branches.map(function (b) {
+    var ok = b.items.filter(function (i) { return i.ok; }).length;
+    return "<div>" + treeBox(b.root + " 분해",
+      "측정됨 " + ok + " / " + b.items.length,
       b.items.map(function (i) {
-        return '<div class="tree-i ' + (i.ok ? "ok" : "no") + '"><span class="ti-d"></span>' +
-          '<span class="ti-n">' + esc(i.n) + '</span><span class="ti-s">' + esc(i.src) + "</span></div>";
-      }).join("") + "</div>";
+        return { d: 1, n: i.n, op: "", ok: i.ok, v: i.ok ? "측정됨" : "미집계", s: i.src };
+      })) + "</div>";
   }).join("") + "</div>";
 
   h += '<div class="card" style="margin-top:18px"><h2>그래서 0순위 과제</h2>' +
@@ -742,7 +742,7 @@ var LVL = {
   "계산": { c: "bg-bl", t: "실적에서 계산으로 도출되는 값" },
   "실적": { c: "bg-gy", t: "현 수준 유지" },
   "과제": { c: "bg-gy", t: "목표 수치가 아니라 과제의 산출물" },
-  "임의": { c: "bg-no", t: "★근거 없음 — 별도 결정 필요" }
+  "임의": { c: "bg-no", t: "★대장에 근거 없음 — 경영진 결정 필요" }
 };
 
 function pCsf() {
@@ -763,7 +763,7 @@ function pCsf() {
 
   h += '<div class="card"><h2>목표값의 근거 등급</h2>' +
     '<p class="sec-d">모든 목표에 어디서 나온 숫자인지를 붙였습니다. 붉은 \'임의\' 배지가 붙은 것은 ' +
-    "제가 관행적으로 넣은 값이며 대장에 근거가 없습니다. 회의에서 그대로 쓰면 안 됩니다.</p>" +
+    "대장에 근거가 없는 값입니다. 회의에서 확정 목표로 쓰기 전에 결정이 필요합니다.</p>" +
     '<div class="tw"><table><thead><tr><th>등급</th><th>뜻</th><th class="num">개수</th>' +
     "</tr></thead><tbody>" +
     Object.keys(LVL).map(function (k) {
@@ -917,29 +917,50 @@ function pBep() {
 
 function pGates() {
   var g = LX.kpi.gates;
-  var pass = g.rows.filter(function (r) { return r.st === "통과"; }).length;
+  var n = function (s) { return g.rows.filter(function (r) { return r.st === s; }).length; };
+  var pass = n("충족");
   var h = '<div class="kpis">' +
-    '<div class="kpi neg"><div class="k-l">통과</div><div class="k-v">' + pass + " / 9</div>" +
-    '<div class="k-s">전부 통과해야 가맹 모집 개시</div></div>' +
-    '<div class="kpi neg"><div class="k-l">미측정</div><div class="k-v">' +
-    g.rows.filter(function (r) { return r.st === "미측정"; }).length +
-    '개</div><div class="k-s">기준값조차 없는 항목</div></div>' +
+    '<div class="kpi neg"><div class="k-l">충족</div><div class="k-v">' + pass + " / 9</div>" +
+    '<div class="k-s">전 항목 충족 시 가맹 모집 개시</div></div>' +
+    '<div class="kpi neg"><div class="k-l">미측정</div><div class="k-v">' + n("미측정") +
+    '개</div><div class="k-s">숫자가 아예 없는 항목</div></div>' +
+    '<div class="kpi neg"><div class="k-l">미완</div><div class="k-v">' + n("미완") +
+    '개</div><div class="k-s">본부가 해야 할 일</div></div>' +
     '<div class="kpi neg"><div class="k-l">걸려 있는 매출</div><div class="k-v">' +
     won(Math.abs(LX.status.gap.roots[0].v)) + '</div><div class="k-s">목표 간격의 ' +
     pct(LX.status.gap.roots[0].s) + "</div></div></div>";
+
   h += '<p class="sec-d">' + esc(g.note) + "</p>";
-  h += '<div class="card">' + '<div class="tw"><table><thead><tr><th>조건</th><th>통과 기준</th>' +
-    '<th class="num">현재</th><th class="num">판정</th></tr></thead><tbody>' +
+
+  h += '<div class="card"><div class="tw"><table><thead><tr><th>요건</th><th>측정 대상</th>' +
+    '<th>충족 기준</th><th class="num">현재</th><th class="num">판정</th>' +
+    "<th>왜 이 요건인가</th><th>왜 이 기준값인가</th></tr></thead><tbody>" +
     g.rows.map(function (r) {
-      var cls = r.st === "통과" ? "bg-ok" : r.st === "미달" ? "bg-no" : "bg-wa";
-      return "<tr><td><b>" + esc(r.n) + "</b></td><td class=\"small muted\">" + esc(r.t) +
-        '</td><td class="num">' + esc(r.now) + '</td><td class="num"><span class="bg ' +
-        cls + '">' + esc(r.st) + "</span></td></tr>";
-    }).join("") + "</tbody></table></div></div>";
+      var cls = r.st === "충족" ? "bg-ok" : r.st === "미달" ? "bg-no" : "bg-wa";
+      return "<tr><td><b>" + esc(r.n) + "</b></td>" +
+        '<td class="small muted nowrap">' + esc(r.tgt) + "</td>" +
+        '<td class="small"><b>' + esc(r.t) + "</b></td>" +
+        '<td class="num">' + esc(r.now) + "</td>" +
+        '<td class="num"><span class="bg ' + cls + '">' + esc(r.st) + "</span></td>" +
+        '<td class="small muted">' + esc(r.why) + "</td>" +
+        '<td class="small muted">' + esc(r.how) + "</td></tr>";
+    }).join("") +
+    '<tr class="tot"><td colspan="2">종합 판정</td><td class="small">' + esc(g.rule) +
+    '</td><td class="num">' + pass + ' / 9</td><td class="num"><span class="bg bg-no">미충족 ' +
+    (9 - pass) + '개</span></td><td colspan="2" class="small muted">' +
+    "▶2026-09 정보공개서 등록 완료로 1가지 충족</td></tr>" +
+    "</tbody></table></div></div>";
+
   h += '<div class="banner b-red"><b>읽는 법</b>' +
-    "'미달'은 측정은 되는데 기준에 못 미친다는 뜻이고, '미측정'은 숫자가 아예 없다는 뜻입니다. " +
-    "미측정 4개와 미완 3개는 데이터가 아니라 <b>일을 하지 않은 것</b>입니다. " +
-    "따라서 가맹 미개시의 원인은 '시장이 안 좋아서'가 아니라 '준비를 시작하지 않아서'입니다.</div>";
+    "'미달'은 측정은 되는데 기준에 못 미친다는 뜻이고, '미측정'은 숫자가 아예 없다는 뜻이며, " +
+    "'미완'은 본부가 해야 할 일을 아직 안 했다는 뜻입니다. " +
+    "미측정 4가지와 미완 3가지는 데이터가 아니라 <b>일의 문제</b>입니다. " +
+    "따라서 가맹 미개시의 원인은 '시장이 안 좋아서'가 아니라 '준비가 끝나지 않아서'입니다.</div>";
+
+  h += '<div class="banner b-amber"><b>기준값 중 하나는 아직 정해지지 않았습니다</b>' +
+    "월 내 재방문율만 '기준값 측정 후 목표 설정'으로 비어 있습니다. 측정된 적이 없어 " +
+    "무엇이 정상 수준인지 모르기 때문입니다. 나머지 여덟 가지는 가맹사업법·가맹계약서 조문 또는 " +
+    "가맹점 손익모델에서 역산한 값입니다.</div>";
   return h;
 }
 
@@ -1240,10 +1261,24 @@ function pPlan() {
     '<input id="wbCut" type="number" step="0.1" min="1" max="10"></div>' +
     '<div class="wb-f"><label for="wbAdv">노출 1인당 가치 (원)</label>' +
     '<input id="wbAdv" type="number" step="100" min="0"></div>' +
-    '<p class="wb-hint">로열티율은 가맹 조건이 확정되지 않아 3%를 가정값으로 둡니다. ' +
+    '<p class="wb-hint">로열티율 3%는 확정된 가맹 조건입니다. 민감도를 볼 때만 값을 바꿔 보십시오. ' +
     "폐점 판정 배수 2배는 '현재 매출의 두 배를 팔아야 한다면 사실상 불가능하다'는 기준입니다. " +
     "노출 1인당 가치는 쇼케이스 매장의 방문자 목표를 계산할 때만 씁니다.</p>" +
     "</div><div id=\"wbOut\"></div></div>";
+
+  h += '<div class="card"><h2>공헌이익률은 몇 %면 되는 건가</h2>' +
+    '<p class="sec-d">자주 나오는 질문인데, <b>절대 기준은 없습니다.</b> 공헌이익률 하나만 보고 좋다 나쁘다를 말할 수 없습니다. ' +
+    "판정 기준은 그 점포의 <b>고정비율</b>(월 고정비 ÷ 월매출)이고, 둘을 비교해야 뜻이 생깁니다.</p>" +
+    '<p class="fx-block">공헌이익률 &gt; 고정비율 → 흑자　·　공헌이익률 = 고정비율 → 손익분기　·　공헌이익률 &lt; 고정비율 → 적자</p>' +
+    '<p class="small">같은 공헌이익률 55%라도 고정비율이 48%면 흑자이고 139%면 큰 적자입니다. ' +
+    "그래서 공헌이익률을 올리는 것(변동비 절감)과 고정비율을 낮추는 것(매출 확대 또는 고정비 절감)은 같은 목표의 두 경로입니다.</p>" +
+    '<div id="wbCm"></div>' +
+    '<div class="banner b-blue" style="margin:16px 0 0"><b>업계 감각으로 보면</b>' +
+    "카페·F&B는 원재료비와 결제수수료를 합쳐 매출의 35~45%가 나가는 것이 보통이므로 " +
+    "<b>공헌이익률 55~65%</b>가 정상 범위입니다. 유인직영(60.6~69.8%)과 무인직영(55.2~76.7%)은 그 범위 안이나 위에 있습니다. " +
+    "<b>투자모델만 48.1~58.9%로 낮은데</b>, 커피를 비싸게 만들어서가 아니라 " +
+    "투자자에게 내는 위탁수수료 20%가 매출에 연동되어 변동비로 들어가기 때문입니다. " +
+    "즉 투자모델은 파는 순간부터 다른 모델보다 매출 1원당 12~17원씩 덜 남는 구조로 시작합니다.</div></div>";
 
   h += '<div class="card"><h2>3단계 — 13개 점포의 목표가 어떻게 나왔는지 전부 펼칩니다</h2>' +
     '<p class="sec-d">위 표의 \'목표 월매출\' 한 칸이 어떤 숫자에서 나왔는지를 계산 과정 그대로 보여 줍니다. ' +
@@ -1257,7 +1292,7 @@ function pPlan() {
     "여기서 월 고정비 1,917만을 빼면 <b>월 적자 1,151만</b>입니다. 이를 30일로 나누면 하루 38만 4천원이고, " +
     "노출 1인당 가치를 1,000원으로 보면 <b>하루 384명</b>이 필요하다는 뜻입니다.</p>" +
     '<div class="banner b-red" style="margin:14px 0 0"><b>★이 계산의 가장 약한 고리는 ‘1,000원’입니다</b>' +
-    "이 값은 제가 넣은 기본값일 뿐 검증된 적이 없습니다. 옥외광고 CPM으로 환산하면 노출 1회의 가치는 보통 " +
+    "이 값은 기본값일 뿐 아직 검증된 적이 없습니다. 옥외광고의 <b>CPM</b>(Cost Per Mille — Mille은 라틴어로 1,000, 즉 <b>1,000회 노출당 비용</b>)으로 환산하면 노출 1회의 가치는 보통 " +
     "5~15원 수준이고, 그 기준을 쓰면 성수는 하루 2만 5천~7만 7천명이 필요해져 카페로서는 불가능한 숫자가 됩니다. " +
     "반대로 매장 방문은 단순 노출이 아니라 브랜드 체험이므로 옥외광고와 같은 단가로 보기도 어렵습니다.<br><br>" +
     "따라서 실무에서는 순서를 뒤집는 것이 낫습니다 — <b>먼저 ‘월 얼마까지 적자를 감수할지’를 경영진이 금액으로 정하고</b>, " +
@@ -1361,6 +1396,26 @@ function wbRender() {
     " 쇼케이스로 고른 점포는 매출 목표를 계산하지 않고 월 적자를 노출가치로 나눈 1일 방문자 목표를 냅니다.</p>";
   box.innerHTML = h;
 
+  /* 공헌이익률 대 고정비율 */
+  var cb = el("wbCm");
+  if (cb) {
+    var cm = '<div class="tw"><table><thead><tr><th>점포</th><th>사업</th>' +
+      '<th class="num">공헌이익률<br>(매출 − 변동비) ÷ 매출</th>' +
+      '<th class="num">고정비율<br>월 고정비 ÷ 월매출</th>' +
+      '<th class="num">차이</th><th>판정</th></tr></thead><tbody>';
+    W.rows.forEach(function (row) {
+      var c = wbCalc(row), fr = c.mFix / c.mRev, d = row.cm - fr;
+      cm += "<tr><td><b>" + esc(row.s) + '</b></td><td class="small muted nowrap">' +
+        esc(row.seg) + '</td><td class="num">' + pct(row.cm) +
+        '</td><td class="num">' + pct(fr) + '</td><td class="num ' + (d >= 0 ? "pos" : "neg") +
+        '"><b>' + (d >= 0 ? "+" : "") + pct(d) + '</b></td><td><span class="bg ' +
+        (d >= 0 ? "bg-ok\">흑자" : d >= -0.2 ? "bg-wa\">적자 — 매출 확대로 도달 가능" :
+          "bg-no\">적자 — 고정비 구조를 바꿔야 함") + "</span></td></tr>";
+    });
+    cm += "</tbody></table></div>";
+    cb.innerHTML = cm;
+  }
+
   /* 점포별 목표 산출 근거 — 계산 과정을 그대로 펼칩니다 */
   var gb = el("wbGoalBasis");
   if (gb) {
@@ -1454,6 +1509,43 @@ function pTasks() {
     won(LX.status.landing[4].v) + "</div></div></div>";
 
   h += '<div class="banner b-amber"><b>과제 등재 규칙</b>' + esc(P.rule) + "</div>";
+
+  /* 사업영역별 커버리지 — 과제가 한쪽에 몰려 있는지 봅니다 */
+  var COV = [
+    { n: "유인직영", m: "매장운영", rev: 1242067956, op: 62515184 },
+    { n: "무인직영", m: "매장운영", rev: 218017040, op: -150721602 },
+    { n: "투자모델", m: "매장운영", rev: 450108151, op: -135751262 },
+    { n: "상품", m: "식자재유통", rev: 186976086, op: 45131317 },
+    { n: "제품", m: "식자재유통", rev: 121422998, op: -24575187 },
+    { n: "전사 · 본부", m: "공통", rev: 0, op: 0 }
+  ];
+  var hit = function (seg) {
+    return P.rows.filter(function (r) {
+      if (seg === "전사 · 본부") return /전사|본부|매장운영 전체|식자재유통/.test(r.seg);
+      return r.seg.indexOf(seg) >= 0;
+    });
+  };
+  h += '<div class="card"><h2>과제가 사업영역별로 고르게 있는가</h2>' +
+    '<p class="sec-d">적자 규모가 큰 사업에 과제가 몰려 있는 것은 정상이지만, ' +
+    "과제가 하나도 없는 사업이 있으면 그것은 관리 공백입니다.</p>" +
+    '<div class="tw"><table><thead><tr><th>세부사업</th><th>구분</th>' +
+    '<th class="num">1~8월 관리 영업손익</th><th class="num">과제 수</th>' +
+    '<th class="num">연환산 기대효과</th><th>과제 ID</th></tr></thead><tbody>' +
+    COV.map(function (c) {
+      var list = hit(c.n);
+      var ef = list.reduce(function (a, b) { return a + (b.opY || 0); }, 0);
+      return "<tr><td><b>" + esc(c.n) + '</b></td><td class="small muted">' + esc(c.m) +
+        '</td><td class="num ' + (c.rev ? sgn(c.op) : "muted") + '">' +
+        (c.rev ? won(c.op) : "—") + '</td><td class="num"><b>' + list.length + "개</b></td>" +
+        '<td class="num">' + (ef ? won(ef) : "—") + '</td><td class="small muted">' +
+        (list.length ? esc(list.map(function (r) { return r.id; }).join(" · ")) :
+          '<span class="bg bg-no">과제 없음</span>') + "</td></tr>";
+    }).join("") + "</tbody></table></div>" +
+    '<p class="tiny" style="margin:12px 0 0">매장운영 세 모델에 과제가 몰린 것은 적자의 96.5%가 거기서 나오기 때문입니다. ' +
+    "다만 제품(로스터리)은 적자 규모가 2,458만으로 작아 보여도 <b>매출 대비로는 −20.2%</b>이고 " +
+    "손익분기까지 매출을 58.7% 늘려야 하므로, 사업으로서의 존립이 걸린 문제입니다. " +
+    "그래서 제품에 P-002·P-010·P-016·P-017·P-002b 다섯 개를 두었습니다.</p></div>";
+
   h += '<p class="sec-d">' + esc(P.note) + " 원인별로 묶었습니다.</p>";
 
   ["gate", "measure", "cost"].forEach(function (rk) {
@@ -1600,10 +1692,9 @@ function pShared() {
     "<b>0원</b>입니다. 그런데 이것은 대부분 정상입니다 — 상품은 <b>3PL(물류 위탁)</b>을 쓰므로 " +
     "자체 창고와 보관 인력이 없고, 그 비용은 운반비 2,322만(매출의 12.4%)에 이미 들어 있습니다. " +
     "로스터리는 생두를 직접 볶는 공장이라 사람·공간·설비가 필요합니다. 사업 형태가 다른 것입니다.</div>" +
-    '<div class="banner b-amber"><b>종전 기술을 정정합니다</b>' +
-    "이 페이지는 한때 '상품 이익률 24.1%가 과대 계상되었다'고 적고 있었습니다. 사실이 아니어서 " +
-    "정정했습니다. 남는 질문은 두 사업이 함께 쓰는 <b>사무·관리 인력</b>(발주·검수·정산)의 몫이 " +
-    "로스터리에만 잡혀 있는지 하나뿐이며, 금액 규모는 크지 않을 것으로 보입니다.</div>";
+    '<div class="banner b-amber"><b>그래서 두 사업의 이익률을 나란히 비교하면 안 됩니다</b>' +
+    "상품 24.1%와 제품 −20.2%는 경영 능력의 차이가 아니라 원가를 어디까지 지느냐의 차이입니다. " +
+    "두 사업은 각각의 기준으로 판단해야 합니다 — 상품은 물량과 거래처, 제품은 손익분기 돌파입니다.</div>";
   h += '<div class="card"><h2>판관비 계정별 부담</h2>' + tbl(S.head, S.rows) + "</div>";
   h += '<div class="card"><h2>그래서 남는 질문은 무엇인가</h2><ul style="line-height:2">' +
     S.findings.map(function (f) { return "<li>" + lk(f) + "</li>"; }).join("") + "</ul>" +
@@ -1745,6 +1836,8 @@ if (document.readyState === "loading") document.addEventListener("DOMContentLoad
 else init();
 
 })();
+
+
 
 
 
