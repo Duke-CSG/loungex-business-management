@@ -113,7 +113,10 @@ function legend(items) {
   }).join("") + "</div>";
 }
 
-/* ── 꺾은선 ────────────────────────────── */
+/* ── 꺾은선 ──────────────────────────────
+   series: [{name,color,data,dash,fill,split}]
+   split = 이 인덱스부터 점선(예측 구간). 실선·점선이 한 칸 겹쳐 이어집니다.
+*/
 function line(id, series, labels, opt) {
   var c = el(id); if (!c || !c.getContext) return;
   opt = opt || {};
@@ -125,61 +128,107 @@ function line(id, series, labels, opt) {
   var x = c.getContext("2d"); if (!x) return;
   try { x.scale(dpr, dpr); } catch (e) {}
 
-  var L = 54, R = 10, T = 12, B = 26;
+  var L = 58, R = 12, T = 14, B = 28;
   var pw = W - L - R, ph = H - T - B;
   var all = [];
-  series.forEach(function (s) { s.data.forEach(function (v) { if (v !== null && v !== undefined) all.push(v); }); });
+  series.forEach(function (s) {
+    s.data.forEach(function (v) { if (v !== null && v !== undefined) all.push(v); });
+  });
   if (!all.length) return;
   var mx = Math.max.apply(null, all), mn = Math.min.apply(null, all);
   if (opt.zero !== false) { mx = Math.max(mx, 0); mn = Math.min(mn, 0); }
-  var pad = (mx - mn) * 0.08 || 1; mx += pad; mn -= pad;
-  var px = function (i) { return L + (labels.length < 2 ? pw / 2 : (pw * i) / (labels.length - 1)); };
+  var pad = (mx - mn) * 0.1 || 1; mx += pad; mn -= pad;
+  var n = labels.length;
+  var px = function (i) { return L + (n < 2 ? pw / 2 : (pw * i) / (n - 1)); };
   var py = function (v) { return T + ph - ((v - mn) / (mx - mn)) * ph; };
 
+  /* 예측 구간 음영 */
+  if (opt.split !== undefined && opt.split < n - 1) {
+    x.fillStyle = "#f4f5f6";
+    x.fillRect(px(opt.split), T, W - R - px(opt.split), ph);
+  }
   /* 격자 + y축 */
-  x.font = "10px sans-serif"; x.textBaseline = "middle";
+  x.font = "10.5px " + (opt.font || "system-ui, sans-serif");
+  x.textBaseline = "middle";
   for (var g = 0; g <= 4; g++) {
     var v = mn + ((mx - mn) * g) / 4, y = py(v);
+    var zero = Math.abs(v) < (mx - mn) / 200;
     x.beginPath(); x.moveTo(L, y); x.lineTo(W - R, y);
-    x.strokeStyle = Math.abs(v) < (mx - mn) / 100 ? "#c9d0d6" : "#eef1f3";
+    x.strokeStyle = zero ? "#b8c0c7" : "#eceef0";
     x.lineWidth = 1; x.stroke();
-    x.fillStyle = "#9aa3ab"; x.textAlign = "right";
-    x.fillText(won(v), L - 7, y);
+    x.fillStyle = "#98a1aa"; x.textAlign = "right";
+    x.fillText(won(v), L - 8, y);
   }
-  /* x축 라벨 */
-  x.textAlign = "center"; x.textBaseline = "top"; x.fillStyle = "#9aa3ab";
-  var step = labels.length > 8 ? (W < 480 ? 3 : 1) : 1;
+  /* x축 */
+  x.textAlign = "center"; x.textBaseline = "top"; x.fillStyle = "#98a1aa";
+  var step = n > 8 ? (W < 520 ? 2 : 1) : 1;
   labels.forEach(function (lb, i) {
     if (i % step) return;
-    x.fillText(lb, px(i), T + ph + 7);
+    x.fillText(lb, px(i), T + ph + 8);
   });
-  /* 선 */
-  series.forEach(function (s) {
-    x.strokeStyle = s.color; x.lineWidth = s.dash ? 1.8 : 2.4;
-    if (x.setLineDash) x.setLineDash(s.dash ? [5, 4] : []);
+
+  /* 선 그리기 — 구간별로 실선/점선을 나눕니다 */
+  function stroke(s, from, to, dashed) {
     x.beginPath();
     var started = false;
-    s.data.forEach(function (v, i) {
-      if (v === null || v === undefined) { started = false; return; }
+    for (var i = from; i <= to; i++) {
+      var v = s.data[i];
+      if (v === null || v === undefined) { started = false; continue; }
       if (!started) { x.moveTo(px(i), py(v)); started = true; }
       else x.lineTo(px(i), py(v));
-    });
+    }
+    x.strokeStyle = s.color;
+    x.lineWidth = s.thin ? 1.6 : 2.4;
+    x.lineJoin = "round"; x.lineCap = "round";
+    if (x.setLineDash) x.setLineDash(dashed ? [5, 4] : []);
     x.stroke();
     if (x.setLineDash) x.setLineDash([]);
-    if (!s.dash) s.data.forEach(function (v, i) {
+  }
+
+  series.forEach(function (s) {
+    var last = s.data.length - 1;
+    /* 면 채우기 */
+    if (s.fill) {
+      x.beginPath();
+      var st = false, fi = 0, li = 0;
+      for (var i = 0; i <= last; i++) {
+        var v = s.data[i];
+        if (v === null || v === undefined) continue;
+        if (!st) { fi = i; x.moveTo(px(i), py(v)); st = true; }
+        else x.lineTo(px(i), py(v));
+        li = i;
+      }
+      if (st) {
+        x.lineTo(px(li), py(Math.max(mn, 0)));
+        x.lineTo(px(fi), py(Math.max(mn, 0)));
+        x.closePath();
+        x.fillStyle = s.fill; x.fill();
+      }
+    }
+    if (s.dash) { stroke(s, 0, last, true); return; }
+    if (s.split !== undefined && s.split < last) {
+      stroke(s, 0, s.split, false);
+      stroke(s, s.split, last, true);
+    } else stroke(s, 0, last, false);
+
+    /* 점 */
+    s.data.forEach(function (v, i) {
       if (v === null || v === undefined) return;
-      x.beginPath(); x.arc(px(i), py(v), 3, 0, Math.PI * 2);
-      x.fillStyle = s.color; x.fill();
+      x.beginPath(); x.arc(px(i), py(v), 3.2, 0, Math.PI * 2);
+      x.fillStyle = "#fff"; x.fill();
+      x.strokeStyle = s.color; x.lineWidth = 2; x.stroke();
     });
   });
 }
-function lineBox(id, series, note) {
-  return '<div class="linebox"><canvas id="' + id + '"></canvas></div>' +
+function lineBox(id, series, note, h) {
+  return '<div class="linebox"><canvas id="' + id + '"' +
+    (h ? ' style="height:' + h + 'px"' : "") + "></canvas></div>" +
     '<div class="chart-legend">' + series.map(function (s) {
-      return "<span><i" + (s.dash ? ' class="dash"' : "") + ' style="' +
-        (s.dash ? "border-top-color:" : "background:") + s.color + '"></i>' + esc(s.name) + "</span>";
+      return '<span style="color:' + s.color + '"><i' + (s.dash ? ' class="dash"' : "") +
+        ' style="background:' + s.color + '"></i><span style="color:var(--ink2)">' +
+        esc(s.name) + "</span></span>";
     }).join("") + "</div>" +
-    (note ? '<p class="tiny" style="margin:8px 0 0">' + esc(note) + "</p>" : "");
+    (note ? '<p class="tiny" style="margin:9px 0 0">' + esc(note) + "</p>" : "");
 }
 
 /* ── 막대 ──────────────────────────────── */
@@ -196,58 +245,54 @@ function bars(items, color) {
 /* ══ 페이지 정의 ═══════════════════════════ */
 var PHASES = [
   { n: "①", t: "목표수립" },
-  { n: "②", t: "CSF · KPI 수립" },
-  { n: "③", t: "사업현황 및 분석" },
-  { n: "④", t: "전략과제 · 실행관리" },
-  { n: "⑤", t: "지표리뷰" },
+  { n: "②", t: "사업현황 및 분석" },
+  { n: "③", t: "전략과제 수립" },
+  { n: "④", t: "실행관리 · 지표리뷰" },
   { n: "＋", t: "부록 — 읽는 법" }
 ];
 
 var PAGES = [
-  { ph: 0, id: "goal",   t: "미션 · 비전 · 2026 목표",
-    s: "우리가 목표하는 바가 무엇인지 명확히 합니다. 숫자 목표만이 아니라 그 목표가 왜 그 숫자인지까지 적습니다.", f: pGoal },
-  { ph: 0, id: "structure", t: "사업 분류 체계",
-    s: "모든 화면이 이 분류를 따릅니다. 매장운영 3개 + 식자재유통 2개 + 가맹.", f: pStruct },
-  { ph: 0, id: "ramp",   t: "2026 월별 상승 기조",
-    s: "연간 80억을 12개월에 어떻게 깔았는지, 그리고 실제가 그 선을 따라갔는지.", f: pRamp },
+  { ph: 0, id: "goal",   t: "미션 · 비전 · 사업전략 · 2026 목표",
+    s: "우리가 목표하는 바가 무엇인지 한 화면에 모았습니다. 숫자 목표만이 아니라 그 목표가 왜 그 숫자인지, 어떤 경로로 달성되는지까지 적습니다.", f: pGoal },
 
-  { ph: 1, id: "tree",   t: "F&B 지표 체계와 측정 상태",
-    s: "매출과 EBITDA를 무엇으로 쪼개는가. 그리고 그중 지금 실제로 측정되는 것은 무엇인가.", f: pTree },
-  { ph: 1, id: "csf",    t: "세부사업별 CSF와 KPI",
-    s: "사업마다 성공의 조건이 다릅니다. CSF는 문장이고 KPI는 그 문장을 재는 숫자입니다.", f: pCsf },
-  { ph: 1, id: "bep",    t: "점포 손익분기 배수 — 자리값·로봇비용 대비 몇 배를 팔아야 하나",
-    s: "점포마다 '이 자리를 쓰려면 자리값의 몇 배를 팔아야 흑자가 되는가'를 계산해 매출목표로 바꿉니다. 달성이 명백히 불가한 점포는 철수하거나 전혀 다른 KPI로 관리합니다.", f: pBep },
-  { ph: 1, id: "gates",  t: "가맹 개시 게이트 9개",
-    s: "무인직영 CSF의 측정 도구이자 가맹 개시의 선행조건입니다.", f: pGates },
-
-  { ph: 2, id: "now",    t: "전사 현황",
-    s: "현재 스코어를 분명히 인식합니다. 1~8월 실적입니다.", f: pNow },
-  { ph: 2, id: "segs",   t: "세부사업별 월별 현황",
-    s: "다섯 사업의 매출·손익 월별 추이와 계획선 대비.", f: pSegs },
-  { ph: 2, id: "gap",    t: "목표 대비 실적 · 원인 특정",
-    s: "현황에서 어떤 점이 가장 문제인지 분명히 공유합니다. 간격을 쪼개 원인까지 내려갑니다.", f: pGap },
-  { ph: 2, id: "stores", t: "점포별 비교",
+  { ph: 1, id: "biz",    t: "세부사업영역별 현황 — 목표 대비 실적",
+    s: "다섯 사업의 1~12월 목표 대비 실적입니다. 8월까지는 실적, 9~12월은 예측입니다. 각 사업의 문제와 그 대표 원인을 함께 적었습니다.", f: pBiz },
+  { ph: 1, id: "now",    t: "전사 현황",
+    s: "다섯 사업을 합친 현재 스코어입니다.", f: pNow },
+  { ph: 1, id: "gap",    t: "목표 대비 실적 · 원인 특정",
+    s: "간격을 사업별로 쪼갠 뒤 다시 원인으로 묶습니다. 과제는 사업이 아니라 원인에 대해 만듭니다.", f: pGap },
+  { ph: 1, id: "stores", t: "점포별 비교",
     s: "사업 평균에 가려진 개별 점포의 문제를 비율로 찾습니다.", f: pStores },
-  { ph: 2, id: "landing", t: "연말 착지 전망",
+  { ph: 1, id: "landing", t: "연말 착지 전망",
     s: "회의에서 결정을 가르는 것은 누계가 아니라 착지입니다.", f: pLanding },
 
-  { ph: 3, id: "tasks",  t: "전략과제",
-    s: "③에서 특정한 원인을 해소하기 위한 프로젝트와 태스크. 원인 없이 만든 과제는 올리지 않습니다.", f: pTasks },
+  { ph: 2, id: "plan",   t: "점포별 목표 설정 — 고정비에서 매출목표를 역산한다",
+    s: "바꿀 수 없는 고정비를 먼저 놓고, 그 위에서 목표 월매출을 계산합니다. 점포마다 흑자전환 타겟인지 쇼케이스인지를 고르면 판정과 목표가 바뀝니다.", f: pPlan },
+  { ph: 2, id: "csf",    t: "세부사업별 CSF와 KPI",
+    s: "사업마다 성공의 조건이 다릅니다. CSF는 문장이고 KPI는 그 문장을 재는 숫자입니다.", f: pCsf },
+  { ph: 2, id: "tasks",  t: "전략과제",
+    s: "②에서 특정한 원인을 해소하기 위한 프로젝트와 태스크. 원인 없이 만든 과제는 올리지 않습니다.", f: pTasks },
+
   { ph: 3, id: "board",  t: "실행관리 규칙",
     s: "과제가 상태를 옮기는 조건. 철저한 실행관리를 위한 최소 규칙입니다.", f: pBoard },
-
-  { ph: 4, id: "review", t: "지표리뷰 — baseline 대비",
+  { ph: 3, id: "review", t: "지표리뷰 — baseline 대비",
     s: "과제 실행에 따라 지표가 실제로 움직였는지 확인합니다.", f: pReview },
-  { ph: 4, id: "loop",   t: "루프 운영 규칙",
-    s: "이 다섯 단계를 매달 어떻게 도는가. 경영진부터 실무진까지 같은 순서로 봅니다.", f: pLoop },
+  { ph: 3, id: "loop",   t: "루프 운영 규칙",
+    s: "이 단계를 매달 어떻게 도는가. 경영진부터 실무진까지 같은 순서로 봅니다.", f: pLoop },
 
-  { ph: 5, id: "pl",     t: "관리손익이란",
+  { ph: 4, id: "tree",   t: "F&B 지표 체계와 측정 상태",
+    s: "매출과 EBITDA를 무엇으로 쪼개는가. 그리고 그중 지금 실제로 측정되는 것은 무엇인가.", f: pTree },
+  { ph: 4, id: "bep",    t: "점포 손익분기 배수 — 계산의 근거",
+    s: "③의 목표 월매출이 어떻게 나왔는지, 로봇비용 배수와 로스터리 적용까지.", f: pBep },
+  { ph: 4, id: "gates",  t: "가맹 개시 게이트 9개",
+    s: "무인직영 CSF의 측정 도구이자 가맹 개시의 선행조건입니다.", f: pGates },
+  { ph: 4, id: "pl",     t: "관리손익이란",
     s: "왜 원본 영업손익을 그대로 쓰지 않는가.", f: pPL },
-  { ph: 5, id: "shared", t: "상품과 제품의 비용 분담",
+  { ph: 4, id: "shared", t: "상품과 제품의 비용 분담",
     s: "상품 이익률 24.1%를 그대로 믿으면 안 되는 이유.", f: pShared },
-  { ph: 5, id: "trust",  t: "숫자 신뢰도",
+  { ph: 4, id: "trust",  t: "숫자 신뢰도",
     s: "확정된 숫자와 아직 확정되지 않은 숫자를 구분합니다.", f: pTrust },
-  { ph: 5, id: "tabs",   t: "대장 탭 지도",
+  { ph: 4, id: "tabs",   t: "대장 탭 지도",
     s: "63개 탭 중 실제로 열어야 하는 것.", f: pTabs }
 ];
 
@@ -259,7 +304,7 @@ function pGoal() {
     "현황에서 무엇이 가장 문제인지 공유하고 · 그 문제를 풀 전략과제를 세우고 · " +
     "실행관리를 통해 지표를 개선한다. 이 루프를 경영진과 실무진이 같은 화면으로 도는 도구입니다.</div>";
 
-  h += '<div class="flow">' + PHASES.slice(0, 5).map(function (p, i) {
+  h += '<div class="flow">' + PHASES.slice(0, 4).map(function (p, i) {
     var first = PAGES.filter(function (x) { return x.ph === i; })[0];
     return '<a class="flow-s" href="#/' + first.id + '"><div class="flow-n">' + p.n + "</div>" +
       "<b>" + esc(p.t) + "</b><span>" + esc(first.t) + "</span></a>";
@@ -295,53 +340,131 @@ function pGoal() {
     "80억 중 " + won(Math.abs(LX.status.gap.roots[0].v)) + "(" + pct(LX.status.gap.roots[0].s) +
     ")가 가맹에서 나오게 설계되어 있는데, 가맹 개시 게이트 9개 중 통과한 것이 0개입니다. " +
     "그중 4개는 측정조차 시작되지 않았습니다. 목표를 낮추거나 게이트를 통과시키거나 둘 중 하나입니다.</div>";
-  return h;
-}
 
-function pStruct() {
-  var h = '<p class="sec-d">이 분류는 관리회계대장 44_프로젝션엔진 §A의 사업계층과 같습니다. ' +
-    "모든 화면·표·차트가 이 다섯(가맹 포함 여섯) 단위로만 쪼개집니다.</p>";
-  LX.goal.structure.forEach(function (d) {
-    h += '<div class="card"><h2>' + esc(d.div) + "</h2>";
-    h += '<div class="tw"><table><thead><tr><th>세부사업</th><th>정의</th><th class="num">규모</th></tr></thead><tbody>';
-    d.subs.forEach(function (s) {
-      h += "<tr><td><b>" + esc(s.name) + "</b></td><td>" + lk(s.desc) +
-        '</td><td class="num">' + esc(s.cnt) + "</td></tr>";
-    });
-    h += "</tbody></table></div></div>";
+  /* ── 사업 분류 체계 ── */
+  h += '<div class="card"><h2>사업 분류 체계</h2>' +
+    '<p class="sec-d">모든 화면·표·차트가 이 다섯(가맹 포함 여섯) 단위로만 쪼개집니다. ' +
+    "44_프로젝션엔진 §A의 사업계층과 같습니다.</p>";
+  LX.goal.structure.forEach(function (d, di) {
+    h += (di ? '<h3 style="margin-top:22px">' : "<h3>") + esc(d.div) + "</h3>" +
+      '<div class="tw"><table><thead><tr><th>세부사업</th><th>정의</th>' +
+      '<th class="num">규모</th></tr></thead><tbody>' +
+      d.subs.map(function (s) {
+        return "<tr><td><b>" + esc(s.name) + "</b></td><td>" + lk(s.desc) +
+          '</td><td class="num">' + esc(s.cnt) + "</td></tr>";
+      }).join("") + "</tbody></table></div>";
   });
-  h += '<div class="banner b-amber"><b>용어 규칙</b>' +
+  h += '<div class="banner b-amber" style="margin:20px 0 0"><b>용어 규칙</b>' +
     "매장운영은 반드시 <b>유인직영 · 무인직영 · 투자모델</b> 셋으로만 부릅니다. " +
-    "'직영매장', '무인매장' 같은 상위 묶음은 세 모델의 손익 구조가 전혀 달라 평균이 왜곡되므로 쓰지 않습니다. " +
-    "23_경영지표의 '참고 — 무인계'는 과거 운영방식 기준의 잔존 분류이며 공식 분류가 아닙니다.</div>";
-  return h;
-}
+    "'직영매장', '무인매장' 같은 상위 묶음은 세 모델의 손익 구조가 전혀 달라 평균이 왜곡되므로 쓰지 않습니다.</div></div>";
 
-function pRamp() {
+  /* ── 월별 상승 기조 ── */
   var r = LX.goal.ramp;
-  var h = '<div class="card"><h2>계획선과 실적선</h2>' +
+  h += '<div class="card"><h2>2026 월별 상승 기조 — 전사</h2>' +
     '<p class="sec-d">' + esc(r.note) + "</p>" +
     lineBox("rampC", [
-      { name: "계획", color: "#9aa3ab", data: r.plan, dash: true },
-      { name: "실적", color: "#16283c", data: r.actual }
-    ], "단위 원 · 1~8월 실적, 9~12월은 계획만 표시") + "</div>";
+      { name: "계획", color: "#98a1aa", data: r.plan, dash: true, thin: true },
+      { name: "실적", color: "#15293e", data: r.actual, fill: "rgba(21,41,62,.06)" }
+    ], "6월에 계획이 2.9배로 뛰는 것은 가맹 개설매출 5.1억이 들어가기 때문입니다. 가맹이 열리지 않으면 이 계획선은 6월 이후 전부 미달로 남습니다.") +
+    "</div>";
 
   var rows = r.plan.map(function (p, i) {
     var a = r.actual[i];
     return [LX.meta.months[i], won(p), a === null ? "—" : won(a),
-      a === null ? "—" : (a - p < 0 ? "−" : "") + won(Math.abs(a - p)).replace("−", ""),
+      a === null ? "—" : (a - p < 0 ? "−" : "+") + won(Math.abs(a - p)),
       a === null ? "—" : pct(a / p, 0)];
   });
   h += '<div class="card"><h2>월별 계획 대 실적</h2>' +
-    tbl(["월", "계획", "실적", "차이", "달성률"], rows) +
-    '<p class="tiny" style="margin:12px 0 0">6월에 계획이 2.9배로 뛰는 것은 가맹 개설매출 5.1억이 들어가기 때문입니다. ' +
-    "가맹이 열리지 않으면 이 계획선은 6월 이후 전부 미달로 남습니다.</p></div>";
+    tbl(["월", "계획", "실적", "차이", "달성률"], rows) + "</div>";
   return h;
 }
-function pRampAfter() { line("rampC", [
-  { name: "계획", color: "#9aa3ab", data: LX.goal.ramp.plan, dash: true },
-  { name: "실적", color: "#16283c", data: LX.goal.ramp.actual }
-], LX.meta.months, { h: 260 }); }
+function pGoalAfter() {
+  line("rampC", [
+    { name: "계획", color: "#98a1aa", data: LX.goal.ramp.plan, dash: true, thin: true },
+    { name: "실적", color: "#15293e", data: LX.goal.ramp.actual, fill: "rgba(21,41,62,.06)" }
+  ], LX.meta.months, { h: 280 });
+}
+
+/* ══ ② 세부사업영역별 현황 ═══════════════ */
+function bizSeries(s) {
+  var act12 = s.act.concat([null, null, null, null]);
+  var fc12 = [];
+  for (var i = 0; i < 12; i++) fc12.push(i < s.act.length - 1 ? null : null);
+  /* 실적 마지막 점에서 예측선이 이어지도록 8월 값을 예측선 시작점으로 둡니다 */
+  fc12[s.act.length - 1] = s.act[s.act.length - 1];
+  s.fcst.forEach(function (v, i) { fc12[s.act.length + i] = v; });
+  return [
+    { name: "계획", color: "#98a1aa", data: s.plan, dash: true, thin: true },
+    { name: "실적 (1~8월)", color: s.color, data: act12, fill: "rgba(21,41,62,.05)" },
+    { name: "예측 (9~12월)", color: s.color, data: fc12, dash: true }
+  ];
+}
+
+function pBiz() {
+  var B = LX.biz, M = LX.meta.months;
+  var h = '<div class="banner b-blue"><b>이 화면을 읽는 법</b>' + esc(B.note) + " " +
+    esc(B.fcstHow) + "</div>";
+
+  /* 요약 표 */
+  h += '<div class="card"><h2>다섯 사업 한눈에</h2>' +
+    '<div class="tw"><table><thead><tr><th>세부사업</th><th class="num">1~8월 실적</th>' +
+    '<th class="num">1~8월 계획</th><th class="num">달성률</th>' +
+    '<th class="num">연말 예측</th><th class="num">연간 계획</th><th class="num">착지 달성률</th>' +
+    "</tr></thead><tbody>" +
+    B.segs.map(function (s) {
+      var a8 = s.act.reduce(function (a, b) { return a + b; }, 0);
+      var p8 = s.plan.slice(0, 8).reduce(function (a, b) { return a + b; }, 0);
+      var py = s.plan.reduce(function (a, b) { return a + b; }, 0);
+      var fy = a8 + s.fcst.reduce(function (a, b) { return a + b; }, 0);
+      return "<tr><td><b>" + esc(s.name) + '</b><span class="mini">' + esc(s.div) +
+        '</span></td><td class="num">' + won(a8) + '</td><td class="num muted">' + won(p8) +
+        '</td><td class="num ' + (a8 / p8 >= 0.9 ? "pos" : "neg") + '">' + pct(a8 / p8, 0) +
+        '</td><td class="num">' + won(fy) + '</td><td class="num muted">' + won(py) +
+        '</td><td class="num ' + (fy / py >= 0.9 ? "pos" : "neg") + '">' + pct(fy / py, 0) +
+        "</td></tr>";
+    }).join("") + "</tbody></table></div></div>";
+
+  /* 사업별 진단 카드 */
+  B.segs.forEach(function (s) {
+    var sg = LX.status.segs.filter(function (x) { return x.key === s.key; })[0] || {};
+    var badge = s.sev === "bad" ? '<span class="bg bg-no">문제 심각</span>'
+      : '<span class="bg bg-wa">주의</span>';
+    h += '<div class="dx"><div class="dx-h">' +
+      '<span class="dx-dot" style="background:' + s.color + '"></span>' +
+      '<b>' + esc(s.name) + '</b><span class="dx-div">' + esc(s.div) + "</span>" + badge +
+      "</div><div class=\"dx-body\">" +
+      lineBox("bz_" + s.key, bizSeries(s), null) +
+      '<div class="dx-pc">' +
+      '<div class="dx-lb p">문제</div><div class="v"><b>' + esc(s.problem) + "</b></div>" +
+      '<div class="dx-lb c">원인</div><div class="v">' + lk(s.cause) + "</div>" +
+      '<div class="dx-lb s">덧붙임</div><div class="v sub">' + lk(s.sub) + "</div>" +
+      "</div></div>" +
+      '<div class="dx-kpi">' +
+      "<div><span>1~8월 매출</span><b>" + won(sg.rev || 0) + "</b></div>" +
+      "<div><span>관리 영업손익</span><b class=\"" + sgn(sg.op || 0) + '">' + won(sg.op || 0) + "</b></div>" +
+      "<div><span>영업이익률</span><b class=\"" + sgn(sg.op || 0) + '">' + pct(sg.margin || 0) + "</b></div>" +
+      "<div><span>전사 매출 비중</span><b>" + pct(sg.share || 0) + "</b></div>" +
+      "</div></div>";
+  });
+
+  /* 각주 인사이트 */
+  h += '<div class="card"><h2>각주 — 이 화면에서 읽어야 할 것</h2>' +
+    '<p class="sec-d">표와 차트만 보면 놓치는 것들입니다. 회의에서 결론이 갈리는 지점이 여기입니다.</p>';
+  B.insights.forEach(function (i, n) {
+    h += '<div style="padding:16px 0;border-bottom:1px solid var(--line2)' +
+      (n === B.insights.length - 1 ? ";border-bottom:0" : "") + '">' +
+      '<b style="display:block;margin-bottom:6px;letter-spacing:-.02em">' + esc(i.n) + "</b>" +
+      '<span class="small muted">' + lk(i.d) + "</span></div>";
+  });
+  h += "</div>";
+  return h;
+}
+function pBizAfter() {
+  var M = LX.meta.months;
+  LX.biz.segs.forEach(function (s) {
+    line("bz_" + s.key, bizSeries(s), M, { h: 250, split: 7 });
+  });
+}
 
 /* ══ ② CSF · KPI ═══════════════════════════ */
 function pTree() {
@@ -757,6 +880,215 @@ function pLanding() {
   return h;
 }
 
+/* ══ ③ 전략과제 워크벤치 ═══════════════════ */
+var WB = { mode: "bep", goal: 5000000, roy: 0.03, adv: 1000, cut: 2.0, pick: {} };
+
+function wbLoad() {
+  try {
+    var raw = localStorage.getItem("lx-wb");
+    if (raw) { var o = JSON.parse(raw); for (var k in o) if (o[k] !== undefined) WB[k] = o[k]; }
+  } catch (e) {}
+  if (LX.work) {
+    if (!Object.keys(WB.pick).length) LX.work.rows.forEach(function (r) { WB.pick[r.s] = "target"; });
+  }
+}
+function wbSave() { try { localStorage.setItem("lx-wb", JSON.stringify(WB)); } catch (e) {} }
+
+function wbCalc(r) {
+  var mRev = r.rev / r.mo, mFix = r.fix / r.mo;
+  var bep = r.cm > 0 ? mFix / r.cm : null;
+  var frCm = r.cm - WB.roy;
+  var fr = frCm > 0 ? (mFix + WB.goal) / frCm : null;
+  var tgt = WB.mode === "bep" ? bep : fr;
+  return {
+    mRev: mRev, mFix: mFix, mRent: r.rent / r.mo, mRobot: r.robot / r.mo,
+    bep: bep, fr: fr, tgt: tgt,
+    mult: tgt && mRev ? tgt / mRev : null,
+    op: mRev * r.cm - mFix
+  };
+}
+function wbVerdict(r, c) {
+  if (WB.pick[r.s] === "showcase") return { k: "sc", n: "쇼케이스", cls: "bl" };
+  if (c.mult === null) return { k: "na", n: "계산 불가", cls: "gy" };
+  if (c.mult <= 1) return { k: "ok", n: "달성 — 유지", cls: "ok" };
+  if (c.mult <= WB.cut) return { k: "go", n: "개선실행", cls: "wa" };
+  return { k: "cut", n: "개선불가 — 폐점", cls: "no" };
+}
+
+function pPlan() {
+  var W = LX.work;
+  var h = '<div class="banner b-blue"><b>이 화면은 계산기입니다</b>' +
+    "점포마다 유형을 고르면 목표와 판정이 즉시 다시 계산됩니다. 선택은 이 브라우저에 저장되므로 " +
+    "다시 열어도 유지되고, 회의 중에 바꿔 가며 볼 수 있습니다.</div>";
+
+  h += '<div class="card"><h2>1단계 — 바꿀 수 없는 것을 먼저 고정합니다</h2>' +
+    '<p class="sec-d">' + lk(W.fixedNote) + "</p>" +
+    '<div class="tw"><table><thead><tr><th>고정 항목</th><th>왜 고정인가</th>' +
+    '<th class="num">1~8월 합계</th><th class="num">매출 대비</th>' +
+    "<th>바꾸려면</th></tr></thead><tbody>" +
+    "<tr><td><b>임차료 + 건물관리비</b></td><td class=\"small muted\">임대차 계약 기간 중에는 바꿀 수 없습니다</td>" +
+    '<td class="num">' + won(W.rows.reduce(function (a, b) { return a + b.rent; }, 0)) +
+    '</td><td class="num">27.5%</td><td class="small">P-006 임대차 재협상 · 철수</td></tr>' +
+    "<tr><td><b>로봇 대가</b></td><td class=\"small muted\">렌탈 약정·투자계약·XYZ 위탁계약으로 정해져 있습니다</td>" +
+    '<td class="num">' + won(W.rows.reduce(function (a, b) { return a + b.robot; }, 0)) +
+    '</td><td class="num">15.7%</td><td class="small">P-007 렌탈 전환 · P-014 배수 5배</td></tr>' +
+    "<tr><td><b>인건비</b></td><td class=\"small muted\">무인은 최소 수준, 유인은 영업시간에 묶여 있습니다</td>" +
+    '<td class="num">' + won(343075676) + '</td><td class="num">18.2%</td>' +
+    "<td class=\"small\">영업시간·배치 조정(미착수)</td></tr>" +
+    "</tbody></table></div>" +
+    '<p class="tiny" style="margin:13px 0 0">이번 분기에 우리가 실제로 움직일 수 있는 변수는 <b>매출</b>과 <b>매장 유형 선택</b> 둘뿐입니다. 그래서 아래에서 매출 목표를 역산합니다.</p></div>';
+
+  h += '<div class="card"><h2>2단계 — 목표에서 필요 월매출을 역산합니다</h2>' +
+    '<p class="sec-d">' + esc(W.goalNote) + "</p>" +
+    '<p style="background:var(--navy-soft);border-radius:8px;padding:14px 18px;font-weight:650;text-align:center;letter-spacing:-.02em">' +
+    "필요 월매출 = (월 고정비 + 목표이익) ÷ (공헌이익률 − 로열티율)</p>" +
+    '<div class="wb-ctl">' +
+    '<div class="wb-f"><label for="wbMode">판정 기준</label>' +
+    '<select id="wbMode"><option value="bep">중간목표 — 매장 BEP 전환</option>' +
+    '<option value="fr">최종목표 — 가맹 전환 시 점주 월수입</option></select></div>' +
+    '<div class="wb-f"><label for="wbGoal">점주 목표 월수입 (원)</label>' +
+    '<input id="wbGoal" type="number" step="500000" min="0"></div>' +
+    '<div class="wb-f"><label for="wbRoy">로열티율 (%)</label>' +
+    '<input id="wbRoy" type="number" step="0.5" min="0" max="50"></div>' +
+    '<div class="wb-f"><label for="wbCut">폐점 판정 배수</label>' +
+    '<input id="wbCut" type="number" step="0.1" min="1" max="10"></div>' +
+    '<div class="wb-f"><label for="wbAdv">노출 1인당 가치 (원)</label>' +
+    '<input id="wbAdv" type="number" step="100" min="0"></div>' +
+    '<p class="wb-hint">로열티율은 가맹 조건이 확정되지 않아 3%를 가정값으로 둡니다. ' +
+    "폐점 판정 배수 2배는 '현재 매출의 두 배를 팔아야 한다면 사실상 불가능하다'는 기준입니다. " +
+    "노출 1인당 가치는 쇼케이스 매장의 방문자 목표를 계산할 때만 씁니다.</p>" +
+    "</div><div id=\"wbOut\"></div></div>";
+
+  h += '<div class="card"><h2>4단계 — 이 표에서 실행계획으로</h2>' +
+    "<p><b>'개선실행'</b> 점포는 목표 월매출이 손에 잡히는 숫자로 나왔으니, 그 숫자를 객단가 × 주문수로 쪼개는 것이 다음 단계입니다. " +
+    "★현재 두 지표가 측정되지 않아 이 분해가 불가능합니다(P-000). 그때까지 목표는 금액으로만 내려갑니다.</p>" +
+    "<p><b>'개선불가 — 폐점'</b> 점포는 경영진 안건입니다. 폐점을 확정하기 전에 <b>쇼케이스로 전환</b>하는 선택지가 있고, " +
+    "그 경우 매출 목표를 떼고 방문자 목표로 갈아끼웁니다. 드롭다운을 바꿔 보면 그 숫자가 바로 나옵니다.</p>" +
+    "<p><b>'쇼케이스'</b>로 고른 점포는 손익 지표로 평가하지 않습니다. 대신 반드시 두 가지를 함께 등록해야 합니다 — " +
+    "허용 적자 한도(월 얼마까지 감수하는가)와 재판정 시점. 이 둘이 없으면 '전략 목적'은 적자를 정당화하는 말이 될 뿐입니다.</p>" +
+    '<p class="tiny">쇼케이스 대체 KPI 후보 — ' + esc(W.showcaseKpis.join(" · ")) + "</p></div>";
+
+  h += '<div class="card"><h2>5단계 — 역산해서 입점 기준을 만듭니다</h2>' +
+    '<p class="sec-d">' + esc(W.entryNote) + "</p><div id=\"wbEntry\"></div>" +
+    '<div class="banner b-amber" style="margin:18px 0 0"><b>이것이 이 작업의 진짜 결과물입니다</b>' +
+    "개별 점포를 살리거나 닫는 것보다 중요한 것은 <b>같은 실수를 반복하지 않는 기준</b>입니다. " +
+    "매출 상승 데이터가 쌓이면 '이 모델에서 월매출은 아무리 잘해도 얼마까지'라는 내부 상한이 생기고, " +
+    "그 상한을 넣으면 '이 금액을 넘는 자리값 물건에는 입점하지 않는다'가 자동으로 나옵니다. " +
+    "지금은 관측 최대치를 임시 상한으로 쓰고 있으므로, 실측이 쌓일수록 이 기준은 정확해집니다.</div></div>";
+  return h;
+}
+
+function wbRender() {
+  var W = LX.work; if (!W) return;
+  var box = el("wbOut"); if (!box) return;
+
+  /* 컨트롤 값 반영 */
+  var m = el("wbMode"), g = el("wbGoal"), r = el("wbRoy"), cu = el("wbCut"), a = el("wbAdv");
+  if (m && m.value !== WB.mode) m.value = WB.mode;
+  if (g && g.value === "") g.value = WB.goal;
+  if (r && r.value === "") r.value = (WB.roy * 100).toFixed(1);
+  if (cu && cu.value === "") cu.value = WB.cut;
+  if (a && a.value === "") a.value = WB.adv;
+
+  var cnt = { ok: 0, go: 0, cut: 0, sc: 0 };
+  var rows = W.rows.map(function (row) {
+    var c = wbCalc(row), v = wbVerdict(row, c);
+    cnt[v.k] = (cnt[v.k] || 0) + 1;
+    return { row: row, c: c, v: v };
+  });
+
+  var h = '<div class="kpis" style="margin-bottom:18px">' +
+    '<div class="kpi pos"><div class="k-l">달성 — 유지</div><div class="k-v">' + cnt.ok +
+    '개점</div><div class="k-s">현재 매출로 목표 충족</div></div>' +
+    '<div class="kpi"><div class="k-l">개선실행</div><div class="k-v">' + cnt.go +
+    '개점</div><div class="k-s">목표배수 ' + WB.cut.toFixed(1) + "배 이하</div></div>" +
+    '<div class="kpi neg"><div class="k-l">개선불가 — 폐점</div><div class="k-v">' + cnt.cut +
+    '개점</div><div class="k-s">경영진 결정 대상</div></div>' +
+    '<div class="kpi"><div class="k-l">쇼케이스</div><div class="k-v">' + cnt.sc +
+    '개점</div><div class="k-s">매출 대신 방문자 목표</div></div></div>';
+
+  h += '<div class="tw"><table><thead><tr><th>점포</th><th>사업</th><th>유형 선택</th>' +
+    '<th class="num">자리값(월)</th><th class="num">로봇 대가(월)</th><th class="num">고정비(월)</th>' +
+    '<th class="num">공헌이익률</th><th class="num">현재 월매출</th><th class="num">목표 월매출</th>' +
+    '<th class="num">배수</th><th>판정 · 목표</th></tr></thead><tbody>';
+
+  ["유인직영", "무인직영", "투자모델"].forEach(function (seg) {
+    rows.filter(function (x) { return x.row.seg === seg; }).forEach(function (x, i) {
+      var row = x.row, c = x.c, v = x.v;
+      var isSc = v.k === "sc";
+      var visit = Math.max(0, -c.op) / 30 / (WB.adv || 1);
+      var cls = v.k === "cut" ? "row-cut" : isSc ? "row-sc" : "";
+      h += "<tr" + (cls ? ' class="' + cls + '"' : "") + (i === 0 ? "" : "") + ">" +
+        "<td><b>" + esc(row.s) + "</b>" +
+        (row.note ? '<span class="mini">' + esc(row.note) + "</span>" : "") + "</td>" +
+        '<td class="small muted nowrap">' + esc(row.seg) + "</td>" +
+        '<td><select class="pick' + (isSc ? " sc" : "") + '" data-s="' + esc(row.s) + '">' +
+        '<option value="target"' + (isSc ? "" : " selected") + ">흑자전환 타겟</option>" +
+        '<option value="showcase"' + (isSc ? " selected" : "") + ">쇼케이스</option></select></td>" +
+        '<td class="num">' + won(c.mRent) + "</td>" +
+        '<td class="num">' + won(c.mRobot) + "</td>" +
+        '<td class="num">' + won(c.mFix) + "</td>" +
+        '<td class="num">' + pct(row.cm) + "</td>" +
+        '<td class="num">' + won(c.mRev) + "</td>" +
+        (isSc
+          ? '<td class="num muted">—</td><td class="num muted">—</td>'
+          : '<td class="num"><b>' + won(c.tgt) + "</b></td>" +
+            '<td class="num ' + (c.mult > WB.cut ? "neg" : c.mult <= 1 ? "pos" : "") + '"><b>' +
+            (c.mult === null ? "—" : c.mult.toFixed(2) + "배") + "</b></td>") +
+        '<td><span class="bg bg-' + v.cls + '">' + esc(v.n) + "</span>" +
+        (isSc
+          ? '<span class="mini">월 적자 ' + won(Math.max(0, -c.op)) +
+            " → 1일 방문자 <b>" + Math.round(visit).toLocaleString("ko-KR") + "명</b> 이상</span>"
+          : '<span class="mini">' + (c.mult === null ? "" :
+              c.mult <= 1 ? "여유 " + won(c.mRev - c.tgt) + "/월"
+              : "부족 " + won(c.tgt - c.mRev) + "/월 (+" + pct(c.mult - 1, 0) + ")") + "</span>") +
+        "</td></tr>";
+    });
+  });
+  h += "</tbody></table></div>";
+
+  h += '<p class="tiny" style="margin:14px 0 0">목표 월매출은 ' +
+    (WB.mode === "bep"
+      ? "<b>중간목표(BEP 전환)</b> 기준입니다 — 월 고정비를 공헌이익으로 정확히 덮는 매출입니다."
+      : "<b>최종목표(가맹 전환 시 점주 월수입 " + won(WB.goal) + ")</b> 기준입니다 — 고정비를 덮고 점주가 " +
+        won(WB.goal) + "을 남기며 LX에 로열티 " + pct(WB.roy, 1) + "를 내는 매출입니다.") +
+    " 쇼케이스로 고른 점포는 매출 목표를 계산하지 않고 월 적자를 노출가치로 나눈 1일 방문자 목표를 냅니다.</p>";
+  box.innerHTML = h;
+
+  /* 역산 입점 기준 */
+  var eb = el("wbEntry"); if (!eb) return;
+  var models = ["유인직영", "무인직영", "투자모델"];
+  var e = '<div class="tw"><table><thead><tr><th>모델</th><th class="num">관측 최대 월매출</th>' +
+    '<th class="num">공헌이익률</th><th class="num">자리값 외 월 고정비</th>' +
+    '<th class="num">허용 자리값 상한(월)</th><th class="num">허용 배수</th>' +
+    "<th>해석</th></tr></thead><tbody>";
+  models.forEach(function (mo) {
+    var list = W.rows.filter(function (x) { return x.seg === mo; });
+    var maxRev = 0, othFix = 0, cmA = 0;
+    list.forEach(function (x) {
+      var c = wbCalc(x);
+      if (c.mRev > maxRev) maxRev = c.mRev;
+      othFix += c.mFix - c.mRent; cmA += x.cm;
+    });
+    othFix /= list.length; cmA /= list.length;
+    var cap = maxRev * (cmA - WB.roy) - othFix - WB.goal;
+    var mult = cap > 0 ? maxRev / cap : null;
+    e += "<tr><td><b>" + esc(mo) + '</b></td><td class="num">' + won(maxRev) +
+      '</td><td class="num">' + pct(cmA) + '</td><td class="num">' + won(othFix) +
+      '</td><td class="num ' + (cap > 0 ? "pos" : "neg") + '"><b>' + won(cap) +
+      '</b></td><td class="num">' + (mult ? mult.toFixed(1) + "배" : "—") +
+      '</td><td class="small muted">' +
+      (cap > 0
+        ? "월 자리값이 <b>" + won(cap) + "</b>을 넘는 물건에는 입점하지 않습니다"
+        : "★현재 원가 구조로는 자리값이 0원이어도 목표를 못 맞춥니다. 자리값이 아니라 로봇비용·인건비를 먼저 손대야 합니다") +
+      "</td></tr>";
+  });
+  e += "</tbody></table></div>" +
+    '<p class="tiny" style="margin:13px 0 0">허용 자리값 = 관측 최대 월매출 × (공헌이익률 − 로열티율) − 자리값 외 월 고정비 − 점주 목표 월수입. ' +
+    "위 컨트롤의 목표 월수입·로열티율을 바꾸면 이 표도 함께 움직입니다.</p>";
+  eb.innerHTML = e;
+}
+
 /* ══ ④ 전략과제 ════════════════════════════ */
 function pTasks() {
   var P = LX.project;
@@ -856,7 +1188,7 @@ function pReview() {
 }
 
 function pLoop() {
-  var h = '<div class="flow">' + PHASES.slice(0, 5).map(function (p, i) {
+  var h = '<div class="flow">' + PHASES.slice(0, 4).map(function (p, i) {
     var first = PAGES.filter(function (x) { return x.ph === i; })[0];
     return '<a class="flow-s" href="#/' + first.id + '"><div class="flow-n">' + p.n + "</div>" +
       "<b>" + esc(p.t) + "</b><span>" + esc(first.t) + "</span></a>";
@@ -951,7 +1283,7 @@ function pTabs() {
 }
 
 /* ══ 라우터 ════════════════════════════════ */
-var AFTER = { ramp: pRampAfter, now: pNowAfter, segs: pSegsAfter };
+var AFTER = { goal: pGoalAfter, biz: pBizAfter, now: pNowAfter, plan: wbRender };
 
 function buildNav(cur) {
   var h = "";
@@ -1004,6 +1336,7 @@ function route() {
 
 /* ── 시작 ──────────────────────────────── */
 function init() {
+  wbLoad();
   el("asofChip").textContent = LX.meta.period + " · " + LX.meta.asOf + " 기준";
   el("sideMeta").innerHTML = esc(LX.meta.source) + "<br>" + esc(LX.meta.note);
 
@@ -1022,6 +1355,20 @@ function init() {
     }
   });
   document.addEventListener("keydown", function (e) { if (e.key === "Escape") closeDrill(); });
+
+  /* 워크벤치 — 드롭다운·입력이 바뀌면 표만 다시 그립니다 */
+  document.addEventListener("change", function (e) {
+    var t = e.target; if (!t || !t.id && !t.className) return;
+    var hit = false;
+    if (t.className && String(t.className).indexOf("pick") >= 0 && t.dataset && t.dataset.s) {
+      WB.pick[t.dataset.s] = t.value; hit = true;
+    } else if (t.id === "wbMode") { WB.mode = t.value; hit = true; }
+    else if (t.id === "wbGoal") { WB.goal = Math.max(0, +t.value || 0); hit = true; }
+    else if (t.id === "wbRoy") { WB.roy = Math.max(0, (+t.value || 0) / 100); hit = true; }
+    else if (t.id === "wbCut") { WB.cut = Math.max(1, +t.value || 2); hit = true; }
+    else if (t.id === "wbAdv") { WB.adv = Math.max(1, +t.value || 1000); hit = true; }
+    if (hit) { wbSave(); wbRender(); }
+  });
   window.addEventListener("hashchange", route);
   window.addEventListener("resize", function () {
     var id = (location.hash || "").replace(/^#\/?/, "");
@@ -1034,3 +1381,4 @@ if (document.readyState === "loading") document.addEventListener("DOMContentLoad
 else init();
 
 })();
+
