@@ -1,0 +1,248 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>라운지엑스 관리회계 포털</title>
+<meta name="description" content="라운지엑스 관리회계대장 — 사업 구조, 목표 대비 실적, 적자의 원인, 개선과제를 한 화면에서">
+<link rel="stylesheet" href="ledger.css">
+</head>
+<body>
+
+<header class="topbar">
+  <div class="wrap topbar-in">
+    <div class="brand">
+      <span class="brand-mark">LX</span>
+      <span class="brand-text">라운지엑스 <b>관리회계 포털</b></span>
+    </div>
+    <nav class="topnav" id="topnav">
+      <a href="#company">회사</a>
+      <a href="#scoreboard">스코어보드</a>
+      <a href="#exceptions">예외보고</a>
+      <a href="#landing">착지 전망</a>
+      <a href="#portfolio">사업</a>
+      <a href="#gap">간격</a>
+      <a href="#cause">원인</a>
+      <a href="#stores">점포</a>
+      <a href="#actions">과제</a>
+      <a href="#decisions">결정</a>
+    </nav>
+  </div>
+</header>
+
+<div class="asof-bar">
+  <div class="wrap asof-in">
+    <span class="dot"></span>
+    <span id="asofText">기준일 로딩 중…</span>
+    <span class="asof-note" id="asofNote"></span>
+  </div>
+</div>
+
+<main class="wrap">
+
+  <!-- ① 회사 -->
+  <section id="company" class="sec">
+    <div class="sec-head">
+      <h2>우리는 어떤 회사인가</h2>
+      <p class="sec-sub">숫자를 읽기 전에 돈이 들어오는 경로부터 봅니다. 회계 숫자는 이 경로를 그대로 옮겨 적은 것입니다.</p>
+    </div>
+    <div class="mv">
+      <div class="mv-card">
+        <span class="mv-label">미션</span>
+        <p id="mission"></p>
+      </div>
+      <div class="mv-card">
+        <span class="mv-label">비전</span>
+        <p id="vision"></p>
+      </div>
+    </div>
+    <div class="lines" id="lines"></div>
+    <div class="callout" id="companyLogic"></div>
+  </section>
+
+  <!-- ② 스코어보드 -->
+  <section id="scoreboard" class="sec">
+    <div class="sec-head">
+      <h2>2026년 목표와 현재 스코어</h2>
+      <p class="sec-sub">목표는 매출 80억 원과 EBITDA 20억 원입니다. 아래는 1~8월 누계 실적입니다.</p>
+    </div>
+    <div class="kpis" id="kpis"></div>
+  </section>
+
+  <!-- ③ 예외보고 -->
+  <section id="exceptions" class="sec">
+    <div class="sec-head">
+      <h2>오늘 논의할 것만 — 예외보고</h2>
+      <p class="sec-sub">임원미팅은 모든 지표를 훑는 자리가 아니라 기준을 벗어난 것만 결정하는 자리입니다. 정상 항목은 접혀 있습니다.</p>
+    </div>
+    <div class="exc-summary" id="excSummary"></div>
+    <div class="table-scroll">
+      <table class="tbl exc-tbl">
+        <thead>
+          <tr><th>점검 항목</th><th class="num">현재값</th><th class="num">기준</th><th class="mid">판정</th><th>이탈이면 무엇을 결정하나</th></tr>
+        </thead>
+        <tbody id="excBody"></tbody>
+      </table>
+    </div>
+    <div class="callout warn">
+      <b>전부 빨간 상태일 때의 순서</b>
+      <p>① 게이트 통과 수(가맹 매출의 선행조건) → ② 렌탈료·임차료·로스터리 고정비(적자의 직접 원인, 계약서 확보가 선행) → ③ 상각 명세(숫자 신뢰도) → ④ 미커버 금액(목표 재조정 여부). 누계 달성률·적자 사업 수·착지 전망은 결과지표이므로 앞의 네 가지가 풀리면 따라서 움직입니다.</p>
+    </div>
+  </section>
+
+  <!-- ④ 착지 전망 -->
+  <section id="landing" class="sec">
+    <div class="sec-head">
+      <h2>연말 착지 전망</h2>
+      <p class="sec-sub">계획과 실적만 보면 얼마나 모자라다까지만 알 수 있습니다. 실제로 결정을 가르는 것은 누계가 아니라 착지입니다.</p>
+    </div>
+    <div class="landing-grid" id="landingGrid"></div>
+    <p class="fine">2026년이 첫 해라 전년 동월 데이터가 없어 계절성을 보정하지 못합니다. 열두 달이 쌓이면 2027년부터 계절지수를 넣을 수 있습니다.</p>
+  </section>
+
+  <!-- ⑤ 포트폴리오 -->
+  <section id="portfolio" class="sec">
+    <div class="sec-head">
+      <h2>사업 포트폴리오</h2>
+      <p class="sec-sub">매출 순위와 손익 순위가 다릅니다. 구성비만 보고 자원을 배분하면 적자를 키우게 됩니다.</p>
+    </div>
+    <div class="chart-row">
+      <div class="chart-card">
+        <h3>누계 매출 구성</h3>
+        <div class="donut-wrap"><canvas id="revDonut" width="260" height="260"></canvas></div>
+        <ul class="legend" id="revLegend"></ul>
+      </div>
+      <div class="chart-card">
+        <h3>누계 비용 구성</h3>
+        <div class="donut-wrap"><canvas id="costDonut" width="260" height="260"></canvas></div>
+        <ul class="legend" id="costLegend"></ul>
+      </div>
+    </div>
+    <div class="table-scroll">
+      <table class="tbl">
+        <thead>
+          <tr><th>사업</th><th class="num">누계 매출</th><th class="num">구성비</th><th class="num">누계 관리손익</th><th class="num">이익률</th><th>한 줄 진단</th></tr>
+        </thead>
+        <tbody id="segBody"></tbody>
+      </table>
+    </div>
+  </section>
+
+  <!-- ⑥ 간격 -->
+  <section id="gap" class="sec">
+    <div class="sec-head">
+      <h2>계획과 얼마나 벌어졌나</h2>
+      <p class="sec-sub">간격의 크기를 재는 것이 아니라 어느 약속이 지켜지지 않았는지를 가립니다.</p>
+    </div>
+    <div class="gap-top" id="gapTop"></div>
+    <div class="gap-bars" id="gapBars"></div>
+    <div class="callout" id="gapVerdict"></div>
+  </section>
+
+  <!-- ⑦ 원인 분해 -->
+  <section id="cause" class="sec">
+    <div class="sec-head">
+      <h2>그 적자가 어느 계정에서 나오나</h2>
+      <p class="sec-sub">사업을 선택하면 계정별로 펼쳐집니다. 원본 회계자료에는 이 숫자가 처음부터 다 있었습니다.</p>
+    </div>
+    <div class="ladder">
+      <div class="step"><span class="step-n">1단계</span><span>어느 사업이 적자인가</span><small>위 포트폴리오 표</small></div>
+      <div class="step"><span class="step-n">2단계</span><span>그 사업의 어느 계정인가</span><small>아래 계정별 분해</small></div>
+      <div class="step"><span class="step-n">3단계</span><span>그 계정의 어느 점포인가</span><small>다음 절 점포별 비율</small></div>
+    </div>
+    <div class="tabs" id="causeTabs"></div>
+    <div id="causePanel"></div>
+  </section>
+
+  <!-- ⑧ 점포별 -->
+  <section id="stores" class="sec">
+    <div class="sec-head">
+      <h2>점포별 비율 — 구조 문제인가, 개별 점포 문제인가</h2>
+      <p class="sec-sub">금액은 매출 규모가 다른 점포끼리 비교할 수 없습니다. 각 점포의 자기 매출로 나눈 비율로 봅니다.</p>
+    </div>
+    <div class="table-scroll">
+      <table class="tbl heat" id="storeTbl"></table>
+    </div>
+    <div class="callout" id="storeTip"></div>
+  </section>
+
+  <!-- ⑨ 과제 -->
+  <section id="actions" class="sec">
+    <div class="sec-head">
+      <h2>개선과제와 기대효과</h2>
+      <p class="sec-sub">원인을 찾는 것으로는 끝나지 않습니다. 과제에 금액이 붙어야 목표 간격과 연결됩니다.</p>
+    </div>
+    <div class="act-sum" id="actSum"></div>
+    <div class="table-scroll">
+      <table class="tbl">
+        <thead>
+          <tr><th>ID</th><th>과제</th><th class="mid">레버</th><th class="num">연환산 매출</th><th class="num">올해 매출</th><th class="num">연환산 손익</th><th>산출 근거</th></tr>
+        </thead>
+        <tbody id="actBody"></tbody>
+      </table>
+    </div>
+  </section>
+
+  <!-- ⑩ 목표 -->
+  <section id="targets" class="sec">
+    <div class="sec-head">
+      <h2>2026년 80억 원은 어떻게 나뉘나</h2>
+      <p class="sec-sub" id="targetRule"></p>
+    </div>
+    <div class="tgt-bars" id="tgtBars"></div>
+    <div class="fr-box" id="frBox"></div>
+  </section>
+
+  <!-- ⑪ 결정 · 신뢰도 -->
+  <section id="decisions" class="sec">
+    <div class="sec-head">
+      <h2>지금 결정이 필요한 것</h2>
+    </div>
+    <div class="dec-grid" id="decGrid"></div>
+
+    <div class="sec-head mt">
+      <h2>숫자를 어디까지 믿어도 되는가</h2>
+      <p class="sec-sub">확정된 것과 아직 확정되지 않은 것을 구분해 둡니다. 알고 쓰는 것과 모르고 쓰는 것은 다릅니다.</p>
+    </div>
+    <div class="callout warn" id="confWarn"></div>
+    <div class="conf-grid">
+      <div class="conf-card ok">
+        <h3>확정된 것</h3>
+        <ul id="confFixed"></ul>
+      </div>
+      <div class="conf-card hold">
+        <h3>아직 확정되지 않은 것</h3>
+        <ul id="confOpen"></ul>
+      </div>
+    </div>
+  </section>
+
+  <!-- ⑫ 탭 지도 -->
+  <section id="tabmap" class="sec">
+    <div class="sec-head">
+      <h2>대장 탭 지도</h2>
+      <p class="sec-sub">탭은 62개이지만 평소에 읽는 것은 초록 다섯 개입니다.</p>
+    </div>
+    <div class="table-scroll">
+      <table class="tbl">
+        <thead><tr><th>티어</th><th class="mid">탭 색</th><th>언제 보나</th><th>해당 탭</th></tr></thead>
+        <tbody id="tabBody"></tbody>
+      </table>
+    </div>
+  </section>
+
+</main>
+
+<footer class="foot">
+  <div class="wrap">
+    <p id="footText"></p>
+    <p class="fine">이 페이지는 관리회계대장의 스냅샷입니다. 원본 수치는 구글시트 대장을 기준으로 합니다.</p>
+  </div>
+</footer>
+
+<button class="totop" id="totop" aria-label="맨 위로">↑</button>
+
+<script src="data.js"></script>
+<script src="ledger.js"></script>
+</body>
+</html>
