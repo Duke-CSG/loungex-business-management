@@ -719,14 +719,22 @@ function pTree() {
     "구체화될 수 없습니다. 무엇을 올릴지 모르기 때문입니다.</div>";
 
   h += '<p class="sec-d">' + esc(t.note) + "</p>";
-  h += '<div class="grid2">' + t.branches.map(function (b) {
+  t.branches.forEach(function (b) {
     var ok = b.items.filter(function (i) { return i.ok; }).length;
-    return "<div>" + treeBox(b.root + " 분해",
-      "측정됨 " + ok + " / " + b.items.length,
+    h += '<div class="card"><h2>' + esc(b.root) + " 분해 — 측정됨 " + ok + " / " +
+      b.items.length + "</h2>" +
+      '<div class="tw"><table><thead><tr><th class="num">측정</th><th>지표</th>' +
+      '<th class="num">현재값</th><th>왜 이 지표가 필요한가</th><th>어디서 나오나</th>' +
+      "</tr></thead><tbody>" +
       b.items.map(function (i) {
-        return { d: 1, n: i.n, op: "", ok: i.ok, v: i.ok ? "측정됨" : "미집계", s: i.src };
-      })) + "</div>";
-  }).join("") + "</div>";
+        return '<tr><td class="num"><span class="bg ' +
+          (i.ok ? "bg-ok\">측정됨" : "bg-no\">미집계") + "</span></td>" +
+          "<td><b>" + esc(i.n) + "</b></td>" +
+          '<td class="num' + (i.ok ? "" : " muted") + '">' + esc(i.v) + "</td>" +
+          '<td class="small">' + esc(i.why) + "</td>" +
+          '<td class="small muted nowrap">' + esc(i.src) + "</td></tr>";
+      }).join("") + "</tbody></table></div></div>";
+  });
 
   h += '<div class="card" style="margin-top:18px"><h2>그래서 0순위 과제</h2>' +
     "<p>측정되지 않는 것은 개선할 수 없습니다. 운영지표 수집 체계 구축(P-000)이 다른 모든 " +
@@ -1716,11 +1724,13 @@ function pTrust() {
 }
 
 function pTabs() {
-  var h = '<p class="sec-d">대장은 63개 탭입니다. 전부 볼 필요는 없습니다. ' +
-    "색으로 역할이 나뉩니다.</p><div class=\"card\">" +
-    '<div class="tw"><table><thead><tr><th>구분</th><th>언제 보는가</th><th>탭</th></tr></thead><tbody>' +
+  var h = '<p class="sec-d">대장은 64개 탭입니다. 전부 볼 필요는 없습니다. ' +
+    "탭 색으로 역할이 나뉘고, 아래 네 단계가 그 색과 같습니다.</p><div class=\"card\">" +
+    '<div class="tw"><table><thead><tr><th>구분</th><th class="nowrap">언제 보는가</th>' +
+    "<th>어떤 자리인가</th><th>탭</th></tr></thead><tbody>" +
     LX.tabs.map(function (t) {
       return "<tr><td><b>" + esc(t.tier) + "</b></td><td class=\"nowrap small\">" + esc(t.when) +
+        '</td><td class="small">' + esc(t.what || "") +
         '</td><td class="small muted">' + esc(t.list) + "</td></tr>";
     }).join("") + "</tbody></table></div></div>";
   h += '<div class="card"><h2>이 사이트와 대장의 관계</h2>' +
