@@ -82,17 +82,52 @@ function openStore(name) {
     '<div class="kpi"><div class="k-l">판정</div><div class="k-v" style="font-size:17px">' +
     esc(v.n) + '</div><div class="k-s">유형: ' + (isSc ? "쇼케이스" : "흑자전환 타겟") + "</div></div></div>";
 
-  h += '<h3 style="margin:18px 0 8px;font-size:14px;font-weight:800">현재 월매출이 어디로 가는가</h3>' +
-    tbl(["구분", "월 금액", "월매출 대비", "성격"], [
-      ["월매출", won(c.mRev), "100.0%", "—"],
-      ["− 변동비", won(c.mRev * (1 - row.cm)), pct(1 - row.cm), "원재료 · 매출연동 수수료"],
-      ["＝ 공헌이익", won(c.mRev * row.cm), pct(row.cm), "고정비를 덮는 데 쓰는 돈"],
-      ["− 자리값 (임차료+건물관리비)", won(c.mRent), pct(c.mRent / c.mRev), "계약으로 고정"],
-      ["− 로봇 대가", won(c.mRobot), pct(c.mRobot / c.mRev), "렌탈·상각·위탁수수료 합계"],
-      ["− 그 밖의 고정비", won(c.mFix - c.mRent), pct((c.mFix - c.mRent) / c.mRev), "인건비 등"],
-      ["＝ 관리 영업손익", won(c.op), pct(c.op / c.mRev), "—"]
-    ]);
-  h += '<p class="tiny" style="margin:12px 0 0">★\'로봇 대가\'는 일부가 변동비(위탁수수료)이고 일부가 고정비(렌탈·상각)여서 위 합계와 단순 가산되지 않습니다. 규모를 보여 주기 위한 참고 줄입니다.</p>';
+  /* 원가 구조 — 매출 100%를 가로 막대 하나로 쪼갭니다 */
+  var vc = c.mRev * (1 - row.cm), fx = c.mFix, pf = c.op;
+  var seg = function (label, val, color, dark) {
+    var p = (val / c.mRev) * 100;
+    if (p <= 0) return "";
+    return '<div class="ws" style="width:' + p.toFixed(2) + "%;background:" + color +
+      (dark ? ";color:#fff" : ";color:#1A1A1A") + '" title="' + esc(label) + " " + won(val) + '">' +
+      (p >= 11 ? '<span class="ws-n">' + esc(label) + "</span><span class=\"ws-v\">" +
+        p.toFixed(0) + "%</span>" : "") + "</div>";
+  };
+  h += '<h3 style="margin:22px 0 4px;font-size:14px;font-weight:800">원가 구조 — 월매출 ' +
+    won(c.mRev) + "을 100%로 놓으면</h3>" +
+    '<p class="tiny" style="margin:0 0 10px">막대 위에 마우스를 올리면 금액이 나옵니다.</p>' +
+    '<div class="wfall">' +
+    seg("변동비", vc, "#CBD0D6") +
+    seg("고정비", fx, "#B03A2E", true) +
+    (pf > 0 ? seg("영업이익", pf, "#1E6B4F", true) : "") +
+    "</div>" +
+    (pf < 0
+      ? '<div class="wfall-over"><div class="ws" style="width:' +
+        Math.min(100, (-pf / c.mRev) * 100).toFixed(2) +
+        '%;background:repeating-linear-gradient(45deg,#B03A2E,#B03A2E 6px,#8E2C22 6px,#8E2C22 12px);color:#fff">' +
+        '<span class="ws-n">초과 적자 ' + won(-pf) + "</span></div>" +
+        '<span class="wfall-lb">고정비가 공헌이익을 ' + pct(-pf / c.mRev) + "만큼 넘어섭니다</span></div>"
+      : "");
+
+  h += '<div class="brk">' +
+    '<div class="brk-c"><div class="brk-h" style="border-color:#CBD0D6">변동비 ' +
+    pct(1 - row.cm) + "</div>" +
+    '<div class="brk-r"><span>금액</span><b>' + won(vc) + "</b></div>" +
+    '<div class="brk-d">원재료원가 + 매출연동 수수료. 매출이 줄면 같이 줄어듭니다.</div></div>' +
+    '<div class="brk-c"><div class="brk-h" style="border-color:#B03A2E">고정비 ' +
+    pct(fx / c.mRev) + "</div>" +
+    '<div class="brk-r"><span>자리값</span><b>' + won(c.mRent) + " · " + pct(c.mRent / c.mRev) + "</b></div>" +
+    '<div class="brk-r"><span>그 밖</span><b>' + won(fx - c.mRent) + " · " + pct((fx - c.mRent) / c.mRev) + "</b></div>" +
+    '<div class="brk-d">매출이 0이어도 그대로 나갑니다. 인건비·로봇렌탈·상각이 여기 있습니다.</div></div>' +
+    '<div class="brk-c"><div class="brk-h" style="border-color:' + (pf < 0 ? "#B03A2E" : "#1E6B4F") +
+    '">관리 영업손익 ' + pct(pf / c.mRev) + "</div>" +
+    '<div class="brk-r"><span>금액</span><b class="' + sgn(pf) + '">' + won(pf) + "</b></div>" +
+    '<div class="brk-d">공헌이익 ' + won(c.mRev * row.cm) + " − 고정비 " + won(fx) + "</div></div>" +
+    "</div>";
+
+  h += '<div class="brk-note"><b>참고 — 로봇 대가 ' + won(c.mRobot) + " · 매출의 " +
+    pct(c.mRobot / c.mRev) + "</b>기계렌탈 + 감가상각비 + 위탁운영수수료 + 위탁수수료를 묶은 값입니다. " +
+    "일부는 변동비(위탁수수료), 일부는 고정비(렌탈·상각)에 들어 있어 위 세 칸과 따로 더해지지 않습니다. " +
+    "모델 간 비교를 위해 규모만 보여 주는 줄입니다.</div>";
 
   if (isSc) {
     var visit = Math.max(0, -c.op) / 30 / (WB.adv || 1);
@@ -384,7 +419,7 @@ var NAVLABEL = {
   goal: "목표와 전략", biz: "사업별 현황", now: "전사 현황", gap: "원인 분해",
   stores: "점포 비교", landing: "착지 전망", plan: "점포 목표 설정", csf: "CSF · KPI",
   tasks: "전략과제", board: "실행관리", review: "지표리뷰", loop: "루프 규칙",
-  tree: "지표 체계", bep: "배수 계산 근거", gates: "가맹 개시 조건",
+  tree: "지표 체계", bep: "배수 계산 근거", gates: "가맹사업 시작 요건",
   pl: "관리손익이란", shared: "상품·제품 비용분담", trust: "숫자 신뢰도", tabs: "대장 탭 지도"
 };
 
@@ -421,12 +456,12 @@ var PAGES = [
     s: "매출과 EBITDA를 무엇으로 쪼개는가. 그리고 그중 지금 실제로 측정되는 것은 무엇인가.", f: pTree },
   { ph: 4, id: "bep",    t: "점포 손익분기 배수 — 계산의 근거",
     s: "③의 목표 월매출이 어떻게 나왔는지, 로봇비용 배수와 로스터리 적용까지.", f: pBep },
-  { ph: 4, id: "gates",  t: "가맹 개시 조건 9가지",
+  { ph: 4, id: "gates",  t: "가맹사업 시작 요건 9가지",
     s: "무인직영 CSF의 측정 도구이자 가맹 개시의 선행조건입니다.", f: pGates },
   { ph: 4, id: "pl",     t: "관리손익이란",
     s: "왜 원본 영업손익을 그대로 쓰지 않는가.", f: pPL },
   { ph: 4, id: "shared", t: "상품과 제품의 비용 분담",
-    s: "상품 이익률 24.1%를 그대로 믿으면 안 되는 이유.", f: pShared },
+    s: "계정 체계는 같은데 금액이 들어간 자리가 다릅니다. 그 대부분은 3PL 위탁과 직접 로스팅이라는 사업 형태 차이에서 오는 정상적인 것입니다.", f: pShared },
   { ph: 4, id: "trust",  t: "숫자 신뢰도",
     s: "확정된 숫자와 아직 확정되지 않은 숫자를 구분합니다.", f: pTrust },
   { ph: 4, id: "tabs",   t: "대장 탭 지도",
@@ -489,7 +524,7 @@ function pGoal() {
 
   h += '<div class="banner b-red"><b>지금 이 목표는 성립하지 않습니다</b>' +
     "80억 중 " + won(Math.abs(LX.status.gap.roots[0].v)) + "(" + pct(LX.status.gap.roots[0].s) +
-    ")가 가맹에서 나오게 설계되어 있는데, 가맹 개시 조건 9가지 중 충족된 것이 0개입니다. " +
+    ")가 가맹에서 나오게 설계되어 있는데, 가맹사업 시작 요건 9가지 중 충족된 것이 0개입니다. " +
     "그중 4개는 측정조차 시작되지 않았습니다. 목표를 낮추거나 조건을 충족시키거나 둘 중 하나입니다.</div>";
 
   /* ── 목표 분해 트리 ── */
@@ -591,8 +626,8 @@ function pBiz() {
   var B = LX.biz, M = LX.meta.months;
   var h = '<div class="banner b-blue"><b>이 화면을 읽는 법</b>' + esc(B.note) + " " +
     esc(B.fcstHow) + "</div>" +
-    '<div class="banner b-amber"><b>손익 차트의 목표선</b>' + esc(B.opNote) +
-    "<br><br><b style=\"display:inline\">손익의 기준</b> " + esc(B.opBasis) + "</div>";
+    '<div class="banner b-amber"><b>손익 차트의 목표선</b>' + esc(B.opNote) + "</div>" +
+    '<div class="banner b-amber"><b>손익의 기준</b>' + esc(B.opBasis) + "</div>";
 
   /* 요약 표 */
   h += '<div class="card"><h2>다섯 사업 한눈에</h2>' +
@@ -701,32 +736,67 @@ function pTree() {
   return h;
 }
 
+var LVL = {
+  "대장": { c: "bg-ok", t: "대장에 명시된 기준값" },
+  "계약": { c: "bg-ok", t: "이미 체결된 계약 조건에서 나온 값" },
+  "계산": { c: "bg-bl", t: "실적에서 계산으로 도출되는 값" },
+  "실적": { c: "bg-gy", t: "현 수준 유지" },
+  "과제": { c: "bg-gy", t: "목표 수치가 아니라 과제의 산출물" },
+  "임의": { c: "bg-no", t: "★근거 없음 — 별도 결정 필요" }
+};
+
 function pCsf() {
   var cmap = {}; LX.status.segs.forEach(function (s) { cmap[s.key] = s.color; });
+
+  var cnt = {};
+  LX.kpi.csf.forEach(function (c) {
+    c.kpis.forEach(function (k) { cnt[k.lv || "임의"] = (cnt[k.lv || "임의"] || 0) + 1; });
+  });
+
   var h = '<div class="banner b-amber"><b>CSF와 KPI는 다릅니다</b>' +
-    "CSF(핵심성공요인)는 <b>이 사업이 성공하려면 반드시 되어야 하는 것</b>을 한 문장으로 쓴 것입니다. " +
-    "KPI는 그 문장이 되고 있는지를 재는 숫자입니다. CSF 없이 KPI만 나열하면 " +
-    "지표가 왜 중요한지 설명할 수 없어, 개선과제의 우선순위를 정하지 못합니다.</div>";
+    "<b style=\"display:inline;font-weight:800\">CSF</b>는 Critical Success Factor, 우리말로 <b>핵심성공요인</b>입니다. " +
+    "‘이 사업이 성공하려면 반드시 되어야 하는 것’을 한 문장으로 쓴 것입니다.<br>" +
+    "<b style=\"display:inline;font-weight:800\">KPI</b>는 Key Performance Indicator, <b>핵심성과지표</b>입니다. " +
+    "그 문장이 실제로 되고 있는지를 재는 숫자입니다.<br><br>" +
+    "CSF 없이 KPI만 나열하면 지표가 왜 중요한지 설명할 수 없어 개선과제의 우선순위를 정하지 못합니다. " +
+    "반대로 CSF만 있고 KPI가 없으면 달성 여부를 판정할 수 없습니다.</div>";
+
+  h += '<div class="card"><h2>목표값의 근거 등급</h2>' +
+    '<p class="sec-d">모든 목표에 어디서 나온 숫자인지를 붙였습니다. 붉은 \'임의\' 배지가 붙은 것은 ' +
+    "제가 관행적으로 넣은 값이며 대장에 근거가 없습니다. 회의에서 그대로 쓰면 안 됩니다.</p>" +
+    '<div class="tw"><table><thead><tr><th>등급</th><th>뜻</th><th class="num">개수</th>' +
+    "</tr></thead><tbody>" +
+    Object.keys(LVL).map(function (k) {
+      return '<tr><td><span class="bg ' + LVL[k].c + '">' + esc(k) + "</span></td><td>" +
+        esc(LVL[k].t) + '</td><td class="num"><b>' + (cnt[k] || 0) + "개</b></td></tr>";
+    }).join("") + "</tbody></table></div></div>";
 
   LX.kpi.csf.forEach(function (c) {
-    h += '<div class="csf"><div class="csf-h">' +
-      '<span class="csf-seg" style="background:' + (cmap[c.key] || "#6b757e") + '">' + esc(c.seg) + "</span>" +
+    var col = cmap[c.key] || "#6B7280";
+    h += '<div class="csf" style="border-top:3px solid ' + col + '">' +
+      '<div class="csf-h"><span class="csf-dot" style="background:' + col + '"></span>' +
+      '<span class="csf-seg">' + esc(c.seg) + "</span>" +
       "<b>" + esc(c.csf) + "</b></div>" +
-      '<div class="csf-why">' + lk(c.why) + "</div><div class=\"csf-k\">" +
-      '<div class="tw"><table><thead><tr><th>KPI</th><th class="num">현재</th><th class="num">목표</th>' +
-      '<th class="num">측정</th><th>비고</th></tr></thead><tbody>' +
+      '<div class="csf-why"><span class="csf-why-lb">왜 이것이 CSF인가</span>' + lk(c.why) + "</div>" +
+      '<div class="csf-k"><div class="tw"><table><thead><tr><th>KPI</th>' +
+      '<th class="num">현재</th><th class="num">목표</th><th class="num">근거 등급</th>' +
+      "<th>목표를 이렇게 정한 이유</th></tr></thead><tbody>" +
       c.kpis.map(function (k) {
-        return "<tr><td><b>" + esc(k.n) + '</b></td><td class="num">' + esc(k.now) +
-          '</td><td class="num">' + esc(k.target) + '</td><td class="num">' +
-          '<span class="bg ' + (k.ok ? "bg-ok\">측정됨" : "bg-no\">미측정") + "</span></td><td class=\"small muted\">" +
-          esc(k.note || "") + "</td></tr>";
+        var lv = LVL[k.lv || "임의"];
+        return "<tr><td><b>" + esc(k.n) + "</b>" +
+          (k.ok ? "" : '<span class="mini">측정 체계 없음</span>') +
+          '</td><td class="num' + (k.ok ? "" : " muted") + '">' + esc(k.now) +
+          '</td><td class="num"><b>' + esc(k.target) + '</b></td>' +
+          '<td class="num"><span class="bg ' + lv.c + '">' + esc(k.lv || "임의") + "</span></td>" +
+          '<td class="small">' + lk(k.basis || "") +
+          (k.note ? '<span class="mini">' + esc(k.note) + "</span>" : "") + "</td></tr>";
       }).join("") + "</tbody></table></div></div></div>";
   });
 
   h += '<div class="banner b-blue"><b>가맹사업에는 CSF를 아직 쓸 수 없습니다</b>' +
     "가맹은 무인직영의 단위경제가 증명된 뒤에야 성립하는 사업입니다. " +
     "무인직영 CSF가 달성되기 전에 가맹 CSF를 세우면 선후가 뒤집힙니다. " +
-    "대신 조건 9가지가 그 자리를 대신합니다.</div>";
+    "대신 가맹사업 시작 요건 9가지가 그 자리를 대신합니다.</div>";
   return h;
 }
 
@@ -1077,7 +1147,7 @@ function pLanding() {
   h += '<div class="banner b-red"><b>결론</b>' +
     "현재 제안된 과제를 전부 성공시켜도 목표의 " + pct(L[3].v / LX.goal.target.revenue) +
     "에 머무릅니다. 남는 " + won(L[4].v) + "은 과제로 메울 수 있는 크기가 아닙니다. " +
-    "선택지는 둘입니다 — <b>가맹 개시 조건 9가지를 충족시켜 가맹을 열거나</b>, <b>목표를 현실적으로 다시 세우거나</b>. " +
+    "선택지는 둘입니다 — <b>가맹사업 시작 요건 9가지를 충족시켜 가맹을 열거나</b>, <b>목표를 현실적으로 다시 세우거나</b>. " +
     "이 결정은 이 사이트가 아니라 경영진 회의에서 해야 합니다.</div>";
   return h;
 }
@@ -1174,6 +1244,25 @@ function pPlan() {
     "폐점 판정 배수 2배는 '현재 매출의 두 배를 팔아야 한다면 사실상 불가능하다'는 기준입니다. " +
     "노출 1인당 가치는 쇼케이스 매장의 방문자 목표를 계산할 때만 씁니다.</p>" +
     "</div><div id=\"wbOut\"></div></div>";
+
+  h += '<div class="card"><h2>3단계 — 13개 점포의 목표가 어떻게 나왔는지 전부 펼칩니다</h2>' +
+    '<p class="sec-d">위 표의 \'목표 월매출\' 한 칸이 어떤 숫자에서 나왔는지를 계산 과정 그대로 보여 줍니다. ' +
+    "상단 컨트롤을 바꾸면 이 표도 같이 움직입니다.</p><div id=\"wbGoalBasis\"></div></div>";
+
+  h += '<div class="card"><h2>쇼케이스 매장의 방문자 목표는 어떻게 나오나</h2>' +
+    '<p class="sec-d">흑자를 포기한 점포는 그 적자만큼의 다른 가치를 만들어야 합니다. ' +
+    "현재 계산식은 적자를 ‘노출 가치’로 환산하는 방식입니다.</p>" +
+    '<p class="fx-block">1일 방문자 목표 = 월 관리 영업손익 적자 ÷ 30일 ÷ 노출 1인당 가치</p>' +
+    '<p class="small">예를 들어 성수를 쇼케이스로 지정하면 — 월 매출 1,379만 × 공헌이익률 55.5% = 공헌이익 766만, ' +
+    "여기서 월 고정비 1,917만을 빼면 <b>월 적자 1,151만</b>입니다. 이를 30일로 나누면 하루 38만 4천원이고, " +
+    "노출 1인당 가치를 1,000원으로 보면 <b>하루 384명</b>이 필요하다는 뜻입니다.</p>" +
+    '<div class="banner b-red" style="margin:14px 0 0"><b>★이 계산의 가장 약한 고리는 ‘1,000원’입니다</b>' +
+    "이 값은 제가 넣은 기본값일 뿐 검증된 적이 없습니다. 옥외광고 CPM으로 환산하면 노출 1회의 가치는 보통 " +
+    "5~15원 수준이고, 그 기준을 쓰면 성수는 하루 2만 5천~7만 7천명이 필요해져 카페로서는 불가능한 숫자가 됩니다. " +
+    "반대로 매장 방문은 단순 노출이 아니라 브랜드 체험이므로 옥외광고와 같은 단가로 보기도 어렵습니다.<br><br>" +
+    "따라서 실무에서는 순서를 뒤집는 것이 낫습니다 — <b>먼저 ‘월 얼마까지 적자를 감수할지’를 경영진이 금액으로 정하고</b>, " +
+    "방문자 수는 그 적자가 정당한지 사후에 검증하는 별도 지표로 둡니다. 이 화면의 노출 단가 입력란은 " +
+    "마케팅팀이 실제 환산 기준을 정할 때까지의 임시 도구로만 쓰십시오.</div></div>";
 
   h += '<div class="card"><h2>4단계 — 이 표에서 실행계획으로</h2>' +
     "<p><b>'개선실행'</b> 점포는 목표 월매출이 손에 잡히는 숫자로 나왔으니, 그 숫자를 객단가 × 주문수로 쪼개는 것이 다음 단계입니다. " +
@@ -1272,37 +1361,80 @@ function wbRender() {
     " 쇼케이스로 고른 점포는 매출 목표를 계산하지 않고 월 적자를 노출가치로 나눈 1일 방문자 목표를 냅니다.</p>";
   box.innerHTML = h;
 
+  /* 점포별 목표 산출 근거 — 계산 과정을 그대로 펼칩니다 */
+  var gb = el("wbGoalBasis");
+  if (gb) {
+    var g = '<div class="tw"><table><thead><tr><th>점포</th><th class="num">실적<br>개월</th>' +
+      '<th class="num">① 월매출</th><th class="num">② 월 고정비</th>' +
+      '<th class="num">③ 공헌이익률</th><th>④ 중간목표(BEP) 계산</th><th class="num">＝ BEP</th>' +
+      '<th>⑤ 최종목표(가맹) 계산</th><th class="num">＝ 가맹목표</th></tr></thead><tbody>';
+    W.rows.forEach(function (row) {
+      var c = wbCalc(row);
+      g += "<tr><td><b>" + esc(row.s) + '</b><span class="mini">' + esc(row.seg) + "</span></td>" +
+        '<td class="num">' + row.mo + '개월</td><td class="num">' + won(c.mRev) +
+        '</td><td class="num">' + won(c.mFix) + '</td><td class="num">' + pct(row.cm) + "</td>" +
+        '<td class="small muted nowrap">' + won(c.mFix) + " ÷ " + pct(row.cm) +
+        '</td><td class="num"><b>' + won(c.bep) + "</b></td>" +
+        '<td class="small muted nowrap">(' + won(c.mFix) + " + " + won(WB.goal) + ") ÷ (" +
+        pct(row.cm) + " − " + pct(WB.roy, 1) + ')</td><td class="num"><b>' + won(c.fr) +
+        "</b></td></tr>";
+    });
+    g += "</tbody></table></div>" +
+      '<div class="banner b-blue" style="margin:16px 0 0"><b>①~⑤가 어떻게 나온 숫자인가</b>' +
+      "<b style=\"display:inline;font-weight:800\">① 월매출</b> = 1~8월 누계 매출 ÷ 실적 개월수. " +
+      "마포프론트원만 7월 개점이라 2개월로 나눕니다.<br>" +
+      "<b style=\"display:inline;font-weight:800\">② 월 고정비</b> = (인건비원가 + 지급임차료원가 + 건물관리비 + 감가상각비 + 소모품비 + 법정복리비 + 기타 + 클라우드비용 + 기계렌탈 + 광고선전비) ÷ 개월수.<br>" +
+      "<b style=\"display:inline;font-weight:800\">③ 공헌이익률</b> = 1 − 변동비율. 변동비 = 원재료원가 + 위탁운영수수료 + 위탁수수료 + 매출수수료 + 판매수수료 + 카드수수료 + 신용카드수수료 + 상표수수료.<br>" +
+      "<b style=\"display:inline;font-weight:800\">④ BEP</b> = ② ÷ ③. 고정비를 공헌이익으로 정확히 덮는 매출입니다.<br>" +
+      "<b style=\"display:inline;font-weight:800\">⑤ 가맹목표</b> = (② + 점주 목표 월수입) ÷ (③ − 로열티율). 로열티는 매출에 비례해 나가므로 공헌이익률에서 뺍니다.</div>";
+    gb.innerHTML = g;
+  }
+
   /* 역산 입점 기준 */
   var eb = el("wbEntry"); if (!eb) return;
   var models = ["유인직영", "무인직영", "투자모델"];
-  var e = '<div class="tw"><table><thead><tr><th>모델</th><th class="num">관측 최대 월매출</th>' +
-    '<th class="num">공헌이익률</th><th class="num">자리값 외 월 고정비</th>' +
-    '<th class="num">허용 자리값 상한(월)</th><th class="num">허용 배수</th>' +
-    "<th>해석</th></tr></thead><tbody>";
+  var e = '<div class="tw"><table><thead><tr><th>모델</th><th>기준 점포</th>' +
+    '<th class="num">Ⓐ 최고 점포<br>월평균 매출</th>' +
+    '<th class="num">Ⓑ 공헌이익률<br>(점포 평균)</th><th class="num">Ⓒ 로열티율</th>' +
+    '<th class="num">Ⓓ 자리값 외<br>월 고정비 평균</th><th class="num">Ⓔ 점주 목표<br>월수입</th>' +
+    '<th class="num">허용 자리값<br>상한(월)</th><th>해석</th></tr></thead><tbody>';
   models.forEach(function (mo) {
     var list = W.rows.filter(function (x) { return x.seg === mo; });
-    var maxRev = 0, othFix = 0, cmA = 0;
+    var maxRev = 0, maxStore = "", othFix = 0, cmA = 0;
     list.forEach(function (x) {
       var c = wbCalc(x);
-      if (c.mRev > maxRev) maxRev = c.mRev;
+      if (c.mRev > maxRev) { maxRev = c.mRev; maxStore = x.s; }
       othFix += c.mFix - c.mRent; cmA += x.cm;
     });
     othFix /= list.length; cmA /= list.length;
     var cap = maxRev * (cmA - WB.roy) - othFix - WB.goal;
-    var mult = cap > 0 ? maxRev / cap : null;
-    e += "<tr><td><b>" + esc(mo) + '</b></td><td class="num">' + won(maxRev) +
-      '</td><td class="num">' + pct(cmA) + '</td><td class="num">' + won(othFix) +
+    var store = W.rows.filter(function (x) { return x.s === maxStore; })[0];
+    e += "<tr><td><b>" + esc(mo) + "</b></td>" +
+      "<td><b>" + esc(maxStore) + '</b><span class="mini">' + store.mo + "개월 평균" +
+      (store.mo < 8 ? " · 개점 초기라 상한으로 쓰기에 주의" : "") + "</span></td>" +
+      '<td class="num">' + won(maxRev) + '</td><td class="num">' + pct(cmA) +
+      '</td><td class="num">− ' + pct(WB.roy, 1) + '</td><td class="num">− ' + won(othFix) +
+      '</td><td class="num">− ' + won(WB.goal) +
       '</td><td class="num ' + (cap > 0 ? "pos" : "neg") + '"><b>' + won(cap) +
-      '</b></td><td class="num">' + (mult ? mult.toFixed(1) + "배" : "—") +
-      '</td><td class="small muted">' +
+      '</b></td><td class="small muted">' +
       (cap > 0
         ? "월 자리값이 <b>" + won(cap) + "</b>을 넘는 물건에는 입점하지 않습니다"
-        : "★현재 원가 구조로는 자리값이 0원이어도 목표를 못 맞춥니다. 자리값이 아니라 로봇비용·인건비를 먼저 손대야 합니다") +
+        : "★자리값이 0원이어도 목표를 못 맞춥니다. 자리값이 아니라 로봇비용·인건비를 먼저 손대야 합니다") +
       "</td></tr>";
   });
   e += "</tbody></table></div>" +
-    '<p class="tiny" style="margin:13px 0 0">허용 자리값 = 관측 최대 월매출 × (공헌이익률 − 로열티율) − 자리값 외 월 고정비 − 점주 목표 월수입. ' +
-    "위 컨트롤의 목표 월수입·로열티율을 바꾸면 이 표도 함께 움직입니다.</p>";
+    '<div class="banner b-blue" style="margin:16px 0 0"><b>계산식과 그 뜻</b>' +
+    '<span class="fx-inline">허용 자리값 = Ⓐ × (Ⓑ − Ⓒ) − Ⓓ − Ⓔ</span>' +
+    "<b style=\"display:inline;font-weight:800\">Ⓐ × (Ⓑ − Ⓒ)</b> — 달성 가능한 최대 월매출에서 변동비와 로열티를 뺀 금액입니다. " +
+    "매출 전액을 쓸 수 있는 것이 아니라 원재료비·수수료로 빠져나가는 몫을 먼저 제외해야 하므로 공헌이익률을 곱합니다. " +
+    "로열티는 가맹 전환 뒤 점주가 매출에 비례해 LX에 내는 돈이라 점주 손에 남지 않으므로 여기서 함께 뺍니다.<br>" +
+    "<b style=\"display:inline;font-weight:800\">− Ⓓ</b> — 그 돈으로 먼저 자리값 외 고정비(인건비·로봇 대가·관리비 등)를 덮습니다.<br>" +
+    "<b style=\"display:inline;font-weight:800\">− Ⓔ</b> — 점주가 가져갈 몫을 남깁니다.<br>" +
+    "<b style=\"display:inline;font-weight:800\">＝ 남는 것</b>이 자리값에 쓸 수 있는 최대 금액입니다. 이 금액을 넘는 물건에 입점하면 그 점포는 처음부터 목표 달성이 불가능합니다.</div>" +
+    '<div class="banner b-amber" style="margin:12px 0 0"><b>Ⓐ의 한계</b>' +
+    "Ⓐ는 그 모델에서 가장 잘하는 점포의 <b>월평균</b> 매출입니다. 특정 월의 최고치가 아니라 기간 평균이라 " +
+    "실제 피크보다 낮고, 반대로 마포프론트원처럼 개점 2개월치뿐인 점포가 평균을 끌어올리기도 합니다. " +
+    "매출 상승 데이터가 쌓이면 이 자리에 '실측으로 확인된 상한'을 넣어야 기준이 정확해집니다.</div>";
   eb.innerHTML = e;
 }
 
@@ -1329,18 +1461,22 @@ function pTasks() {
     if (!rows.length) return;
     h += '<div class="card"><h2>원인 — ' + esc(rootName[rk] || rk) + "</h2>";
     rows.forEach(function (a) {
-      h += '<div class="act' + (a.top ? " top" : "") + '"><div class="act-h">' +
-        '<span class="act-id">' + esc(a.id) + "</span><b>" + esc(a.name) + "</b>" +
+      h += '<div class="act' + (a.top ? " top" : "") + '">' +
+        '<div class="act-h"><span class="act-id">' + esc(a.id) + "</span>" +
+        "<b>" + esc(a.name) + "</b>" +
         '<span class="bg bg-gy">' + esc(a.lever) + "</span>" +
         '<span class="bg ' + (a.hold ? "bg-wa\">보류" : "bg-bl\">" + esc(a.status)) + "</span></div>" +
-        '<div class="act-m">' +
-        "<span>사업 <b>" + esc(a.seg) + "</b></span>" +
-        "<span>담당 <b>" + esc(a.owner) + "</b></span>" +
-        "<span>기한 <b>" + esc(a.due) + "</b></span>" +
-        "<span>올해 매출 <b>" + (a.revT ? won(a.revT) : "—") + "</b></span>" +
-        "<span>연환산 손익 <b>" + (a.opY ? won(a.opY) : "—") + "</b></span></div>" +
-        '<div class="act-b"><span class="lbl">산출 근거</span>' + lk(a.basis) +
-        '<p style="margin:8px 0 0"><span class="lbl">측정지표</span>' + esc(a.metric) + "</p></div></div>";
+        '<dl class="act-g">' +
+        '<dt>대상 사업</dt><dd>' + esc(a.seg) + "</dd>" +
+        "<dt>담당</dt><dd>" + esc(a.owner) +
+        (a.owner.indexOf("·") >= 0 || /[가-힣]{2,4}$/.test(a.owner) === false
+          ? '<span class="mini">★부서명입니다. 개인 이름으로 바꿔야 \'승인\'으로 넘어갑니다</span>' : "") + "</dd>" +
+        "<dt>기한</dt><dd>" + esc(a.due) + "</dd>" +
+        "<dt>올해 실현 기대 — 매출</dt><dd>" + (a.revT ? "<b>" + won(a.revT) + "</b>" : "—") + "</dd>" +
+        "<dt>연환산 기대효과 — 손익</dt><dd>" + (a.opY ? "<b>" + won(a.opY) + "</b>" : "—") + "</dd>" +
+        "<dt>기대효과 산출 근거</dt><dd>" + lk(a.basis) + "</dd>" +
+        "<dt>실현 측정지표</dt><dd>" + esc(a.metric) + "</dd>" +
+        "</dl></div>";
     });
     h += "</div>";
   });
@@ -1459,14 +1595,19 @@ function pPL() {
 
 function pShared() {
   var S = LX.sharedCost; if (!S) return "<p>데이터 없음</p>";
-  var h = '<div class="banner b-red"><b>결론부터</b>' +
-    "상품(B2B 원부자재)은 인건비 · 지급임차료 · 감가상각비 · 수도광열비 · 건물관리비를 " +
-    "<b>한 푼도 부담하지 않습니다</b>. 모든 공유 자원 비용이 제품(로스터리)에 붙어 있습니다. " +
-    "그래서 상품 이익률 24.1%는 과대, 로스터리 적자는 과대입니다.</div>";
+  var h = '<div class="banner b-blue"><b>결론부터</b>' +
+    "상품(B2B 원부자재)은 인건비 · 지급임차료 · 감가상각비 · 수도광열비 · 건물관리비가 " +
+    "<b>0원</b>입니다. 그런데 이것은 대부분 정상입니다 — 상품은 <b>3PL(물류 위탁)</b>을 쓰므로 " +
+    "자체 창고와 보관 인력이 없고, 그 비용은 운반비 2,322만(매출의 12.4%)에 이미 들어 있습니다. " +
+    "로스터리는 생두를 직접 볶는 공장이라 사람·공간·설비가 필요합니다. 사업 형태가 다른 것입니다.</div>" +
+    '<div class="banner b-amber"><b>종전 기술을 정정합니다</b>' +
+    "이 페이지는 한때 '상품 이익률 24.1%가 과대 계상되었다'고 적고 있었습니다. 사실이 아니어서 " +
+    "정정했습니다. 남는 질문은 두 사업이 함께 쓰는 <b>사무·관리 인력</b>(발주·검수·정산)의 몫이 " +
+    "로스터리에만 잡혀 있는지 하나뿐이며, 금액 규모는 크지 않을 것으로 보입니다.</div>";
   h += '<div class="card"><h2>판관비 계정별 부담</h2>' + tbl(S.head, S.rows) + "</div>";
-  h += '<div class="card"><h2>그래서 무엇이 문제인가</h2><ul style="line-height:2">' +
+  h += '<div class="card"><h2>그래서 남는 질문은 무엇인가</h2><ul style="line-height:2">' +
     S.findings.map(function (f) { return "<li>" + lk(f) + "</li>"; }).join("") + "</ul>" +
-    '<p class="tiny">관련 과제 — P-011 상품·제품 공유비용 배부 기준 수립</p></div>';
+    '<p class="tiny">관련 과제 — P-015 상품·제품 사무·관리 인력 배부 기준 수립</p></div>';
   return h;
 }
 
@@ -1510,13 +1651,14 @@ function buildNav(cur) {
     var first = PAGES.filter(function (x) { return x.ph === i; })[0];
     if (!first) return "";
     return '<a class="navtab' + (page.ph === i ? " active" : "") + '" href="#/' + first.id +
-      '">' + esc(p.n + " " + p.t) + "</a>";
+      '"><b>' + esc(p.n) + "</b> " + esc(p.t) + "</a>";
   }).join("");
 
   /* 좌측 — 현재 단계의 페이지 */
   var list = PAGES.filter(function (x) { return x.ph === page.ph; });
   el("sideNav").innerHTML =
-    '<div class="nav-ph-head">' + esc(PHASES[page.ph].n + " " + PHASES[page.ph].t) + "</div>" +
+    '<div class="nav-ph-head"><span class="nav-ph-num">' + esc(PHASES[page.ph].n) +
+    "</span>" + esc(PHASES[page.ph].t) + "</div>" +
     list.map(function (x) {
       return '<a class="nav-a' + (x.id === cur ? " on" : "") + '" href="#/' + x.id + '">' +
         esc(NAVLABEL[x.id] || x.t) + "</a>";
@@ -1603,6 +1745,8 @@ if (document.readyState === "loading") document.addEventListener("DOMContentLoad
 else init();
 
 })();
+
+
 
 
 
