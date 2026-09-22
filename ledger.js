@@ -42,7 +42,73 @@ function lk(text) {
   return s;
 }
 
+/* 점포 하나의 현재 월매출 vs 목표 월매출 막대 비교 */
+function openStore(name) {
+  var row = LX.work.rows.filter(function (r) { return r.s === name; })[0];
+  if (!row) return;
+  var c = wbCalc(row), v = wbVerdict(row, c);
+  var isSc = v.k === "sc";
+  var mode = WB.mode === "bep" ? "중간목표 — BEP 전환" :
+    "최종목표 — 가맹 전환 시 점주 월수입 " + won(WB.goal);
+  var mx = Math.max(c.mRev, c.bep || 0, c.fr || 0) * 1.08 || 1;
+  var bar = function (label, val, color, sub) {
+    return '<div class="cmp-row"><div class="cmp-lb"><span>' + esc(label) +
+      "</span><b>" + won(val) + "</b></div>" +
+      '<div class="cmp-t"><div class="cmp-f" style="width:' +
+      Math.max(1.5, (val / mx) * 100).toFixed(1) + "%;background:" + color + '">' +
+      (val / mx > 0.18 ? esc(sub || "") : "") + "</div></div>" +
+      (val / mx <= 0.18 && sub ? '<div class="mini">' + esc(sub) + "</div>" : "") + "</div>";
+  };
+
+  var h = "<h2>" + esc(row.s) + " — 현재 월매출과 목표 월매출</h2>" +
+    '<p class="dsub">' + esc(row.seg) + " · " + esc(mode) +
+    (row.note ? " · " + esc(row.note) : "") + "</p>";
+
+  h += '<div class="cmp">' +
+    bar("현재 월매출", c.mRev, "#1E3A5F", "실적 " + row.mo + "개월 평균") +
+    bar("중간목표 — BEP 월매출", c.bep, WB.mode === "bep" ? "#B4690E" : "#CBD0D6",
+      "월 고정비 " + won(c.mFix) + " ÷ 공헌이익률 " + pct(row.cm)) +
+    bar("최종목표 — 점주 월수입 " + won(WB.goal), c.fr, WB.mode === "fr" ? "#B03A2E" : "#CBD0D6",
+      "(월 고정비 + " + won(WB.goal) + ") ÷ (공헌이익률 − 로열티 " + pct(WB.roy, 1) + ")") +
+    "</div>";
+
+  h += '<div class="kpis" style="margin:20px 0 6px">' +
+    '<div class="kpi"><div class="k-l">' + (WB.mode === "bep" ? "BEP" : "가맹") +
+    ' 달성 배수</div><div class="k-v' + (c.mult > WB.cut ? " neg" : c.mult <= 1 ? " pos" : "") +
+    '">' + (c.mult === null ? "—" : c.mult.toFixed(2) + "배") + "</div>" +
+    '<div class="k-s">' + (c.mult <= 1 ? "이미 달성" : "부족 " + won(c.tgt - c.mRev) + "/월") + "</div></div>" +
+    '<div class="kpi ' + sgn(c.op) + '"><div class="k-l">월 관리 영업손익</div><div class="k-v">' +
+    won(c.op) + '</div><div class="k-s">매출 × 공헌이익률 − 고정비</div></div>' +
+    '<div class="kpi"><div class="k-l">판정</div><div class="k-v" style="font-size:17px">' +
+    esc(v.n) + '</div><div class="k-s">유형: ' + (isSc ? "쇼케이스" : "흑자전환 타겟") + "</div></div></div>";
+
+  h += '<h3 style="margin:18px 0 8px;font-size:14px;font-weight:800">현재 월매출이 어디로 가는가</h3>' +
+    tbl(["구분", "월 금액", "월매출 대비", "성격"], [
+      ["월매출", won(c.mRev), "100.0%", "—"],
+      ["− 변동비", won(c.mRev * (1 - row.cm)), pct(1 - row.cm), "원재료 · 매출연동 수수료"],
+      ["＝ 공헌이익", won(c.mRev * row.cm), pct(row.cm), "고정비를 덮는 데 쓰는 돈"],
+      ["− 자리값 (임차료+건물관리비)", won(c.mRent), pct(c.mRent / c.mRev), "계약으로 고정"],
+      ["− 로봇 대가", won(c.mRobot), pct(c.mRobot / c.mRev), "렌탈·상각·위탁수수료 합계"],
+      ["− 그 밖의 고정비", won(c.mFix - c.mRent), pct((c.mFix - c.mRent) / c.mRev), "인건비 등"],
+      ["＝ 관리 영업손익", won(c.op), pct(c.op / c.mRev), "—"]
+    ]);
+  h += '<p class="tiny" style="margin:12px 0 0">★\'로봇 대가\'는 일부가 변동비(위탁수수료)이고 일부가 고정비(렌탈·상각)여서 위 합계와 단순 가산되지 않습니다. 규모를 보여 주기 위한 참고 줄입니다.</p>';
+
+  if (isSc) {
+    var visit = Math.max(0, -c.op) / 30 / (WB.adv || 1);
+    h += '<div class="banner b-blue" style="margin:18px 0 0"><b>쇼케이스로 지정된 점포입니다</b>' +
+      "매출 목표 대신 방문자 목표로 관리합니다. 월 적자 " + won(Math.max(0, -c.op)) +
+      "을 30일로 나누고 노출 1인당 가치 " + won(WB.adv) + "으로 나누면 <b>1일 " +
+      Math.round(visit).toLocaleString("ko-KR") + "명</b> 이상이 필요합니다. " +
+      "이 숫자를 허용 적자 한도와 재판정 시점과 함께 42_의사결정기록에 등재해야 합니다.</div>";
+  }
+  el("drillBody").innerHTML = h;
+  el("drillLayer").hidden = false;
+  document.body.style.overflow = "hidden";
+}
+
 function openDrill(key) {
+  if (key.indexOf("store:") === 0) return openStore(key.slice(6));
   var d = LX.drill[key]; if (!d) return;
   var h = "<h2>" + esc(d.title) + "</h2>";
   if (d.desc) h += '<p class="dsub">' + esc(d.desc) + "</p>";
@@ -219,16 +285,79 @@ function line(id, series, labels, opt) {
       x.strokeStyle = s.color; x.lineWidth = 2; x.stroke();
     });
   });
+
+  /* 마우스를 올리면 그 달의 숫자와 사유가 나옵니다 */
+  bindTip(c, { px: px, labels: labels, series: series, notes: opt.notes, L: L, R: R, W: W });
 }
+
+function bindTip(c, meta) {
+  var tip = el(c.id + "_tip");
+  if (!tip || !c.addEventListener || c.__tipBound) return;
+  c.__tipBound = 1;
+  c.addEventListener("mousemove", function (ev) {
+    var rect = c.getBoundingClientRect ? c.getBoundingClientRect() : { left: 0, width: meta.W };
+    var ox = ev.clientX - rect.left;
+    var best = 0, bd = 1e9;
+    for (var i = 0; i < meta.labels.length; i++) {
+      var d = Math.abs(meta.px(i) - ox);
+      if (d < bd) { bd = d; best = i; }
+    }
+    var h = "<b>" + esc(meta.labels[best]) + "</b>";
+    meta.series.forEach(function (s) {
+      var v = s.data[best];
+      if (v === null || v === undefined) return;
+      h += '<div class="cv"><span>' + esc(s.name) + "</span><span style=\"color:#fff\">" +
+        won(v) + "</span></div>";
+    });
+    var n = meta.notes && meta.notes[best];
+    if (n) h += '<div class="cn"><b style="font-size:11.5px;margin-bottom:3px">' +
+      esc(n.t) + "</b>" + esc(n.d) + "</div>";
+    tip.innerHTML = h;
+    tip.className = "ctip on";
+    var left = meta.px(best) + 14;
+    if (left > meta.W - 300) left = meta.px(best) - 296;
+    if (left < 0) left = 4;
+    tip.style.left = left + "px";
+    tip.style.top = "8px";
+  });
+  c.addEventListener("mouseleave", function () { tip.className = "ctip"; });
+}
+
 function lineBox(id, series, note, h) {
   return '<div class="linebox"><canvas id="' + id + '"' +
-    (h ? ' style="height:' + h + 'px"' : "") + "></canvas></div>" +
+    (h ? ' style="height:' + h + 'px"' : "") + '></canvas>' +
+    '<div class="ctip" id="' + id + '_tip"></div></div>' +
     '<div class="chart-legend">' + series.map(function (s) {
       return '<span style="color:' + s.color + '"><i' + (s.dash ? ' class="dash"' : "") +
-        ' style="background:' + s.color + '"></i><span style="color:var(--ink2)">' +
+        ' style="background:' + s.color + '"></i><span style="color:var(--mid)">' +
         esc(s.name) + "</span></span>";
     }).join("") + "</div>" +
     (note ? '<p class="tiny" style="margin:9px 0 0">' + esc(note) + "</p>" : "");
+}
+
+/* ── 위계 트리 ─────────────────────────── */
+function treeBox(title, sub, items) {
+  return '<div class="tree"><div class="tr-h">' + esc(title) +
+    "<span>" + esc(sub) + "</span></div>" +
+    items.map(function (i) {
+      return '<div class="tr-i ' + (i.ok ? "ok" : "no") + (i.d === 0 ? " lv0" : "") + '">' +
+        '<span class="tr-ind" style="width:' + (i.d * 17) + "px\">" +
+        (i.d ? "└" : "") + "</span>" +
+        '<span class="tr-op">' + esc(i.op || "") + "</span>" +
+        '<span class="tr-d"></span>' +
+        '<span class="tr-n">' + esc(i.n) + "</span>" +
+        '<span class="tr-v">' + esc(i.v || "") + "</span>" +
+        '<span class="tr-s">' + esc(i.s || "") + "</span></div>";
+    }).join("") + "</div>";
+}
+
+/* ── 용어 정의 ─────────────────────────── */
+function defBox(list) {
+  return '<div class="defs">' + list.map(function (d) {
+    return '<div class="def"><b>' + esc(d.n) + "</b>" +
+      '<span class="fx">' + esc(d.f) + "</span>" +
+      '<span class="ex">' + lk(d.e) + "</span></div>";
+  }).join("") + "</div>";
 }
 
 /* ── 막대 ──────────────────────────────── */
@@ -250,6 +379,14 @@ var PHASES = [
   { n: "④", t: "실행관리 · 지표리뷰" },
   { n: "＋", t: "부록 — 읽는 법" }
 ];
+
+var NAVLABEL = {
+  goal: "목표와 전략", biz: "사업별 현황", now: "전사 현황", gap: "원인 분해",
+  stores: "점포 비교", landing: "착지 전망", plan: "점포 목표 설정", csf: "CSF · KPI",
+  tasks: "전략과제", board: "실행관리", review: "지표리뷰", loop: "루프 규칙",
+  tree: "지표 체계", bep: "배수 계산 근거", gates: "가맹 개시 조건",
+  pl: "관리손익이란", shared: "상품·제품 비용분담", trust: "숫자 신뢰도", tabs: "대장 탭 지도"
+};
 
 var PAGES = [
   { ph: 0, id: "goal",   t: "미션 · 비전 · 사업전략 · 2026 목표",
@@ -284,7 +421,7 @@ var PAGES = [
     s: "매출과 EBITDA를 무엇으로 쪼개는가. 그리고 그중 지금 실제로 측정되는 것은 무엇인가.", f: pTree },
   { ph: 4, id: "bep",    t: "점포 손익분기 배수 — 계산의 근거",
     s: "③의 목표 월매출이 어떻게 나왔는지, 로봇비용 배수와 로스터리 적용까지.", f: pBep },
-  { ph: 4, id: "gates",  t: "가맹 개시 게이트 9개",
+  { ph: 4, id: "gates",  t: "가맹 개시 조건 9가지",
     s: "무인직영 CSF의 측정 도구이자 가맹 개시의 선행조건입니다.", f: pGates },
   { ph: 4, id: "pl",     t: "관리손익이란",
     s: "왜 원본 영업손익을 그대로 쓰지 않는가.", f: pPL },
@@ -299,23 +436,31 @@ var PAGES = [
 /* ══ ① 목표수립 ═══════════════════════════ */
 function pGoal() {
   var g = LX.goal;
-  var h = '<div class="banner b-blue"><b>이 사이트의 목적</b>' +
-    "우리가 목표하는 바가 무엇인지 명확히 하고 · 현재 스코어를 분명히 인식하고 · " +
-    "현황에서 무엇이 가장 문제인지 공유하고 · 그 문제를 풀 전략과제를 세우고 · " +
-    "실행관리를 통해 지표를 개선한다. 이 루프를 경영진과 실무진이 같은 화면으로 도는 도구입니다.</div>";
 
-  h += '<div class="flow">' + PHASES.slice(0, 4).map(function (p, i) {
-    var first = PAGES.filter(function (x) { return x.ph === i; })[0];
-    return '<a class="flow-s" href="#/' + first.id + '"><div class="flow-n">' + p.n + "</div>" +
-      "<b>" + esc(p.t) + "</b><span>" + esc(first.t) + "</span></a>";
-  }).join("") + "</div>";
+  /* ── 히어로 ── */
+  var h = '<div class="hero"><div class="hero-inner">' +
+    '<div class="hero-eyebrow">MISSION</div>' +
+    '<div class="hero-mission">' + esc(g.mission) + "</div>" +
+    '<div class="hero-note">' + esc(g.missionNote) + "</div></div></div>" +
+    '<div class="mvc-block">' +
+    '<div class="mvc-vision"><span class="mvc-label">VISION</span><p>' + esc(g.vision) +
+    '</p><div class="mvc-src">' + esc(g.visionNote) + "</div></div>" +
+    '<div class="mvc-vision"><span class="mvc-label">' + esc(g.roleLabel) + "</span><p>" +
+    esc(g.role) + '</p><div class="mvc-src">02_전략기준 4행</div></div></div>';
 
-  h += '<div class="card"><h2>MISSION</h2><p style="font-size:16px;line-height:1.85">' +
-    esc(g.mission) + "</p>" +
-    '<h2 style="margin-top:22px">VISION</h2><p style="font-size:16px;line-height:1.85">' +
-    esc(g.vision) + "</p></div>";
+  h += '<div class="banner b-blue" style="margin-top:24px"><b>출처</b>' + esc(g.src) + "</div>";
 
-  h += '<div class="kpis">' +
+  /* ── 성과의 4축 ── */
+  h += '<div class="sec-title">' + esc(g.axes.t) +
+    "<small>" + esc(g.axes.d) + "</small></div>" +
+    '<div class="grid2" style="gap:14px">' + g.axes.list.map(function (a) {
+      return '<div class="card" style="margin:0"><h2>' + esc(a.n) + '</h2>' +
+        '<p class="tiny" style="margin:0">' + esc(a.k) + "</p></div>";
+    }).join("") + "</div>";
+
+  /* ── 2026 목표 ── */
+  h += '<div class="sec-title">2026 목표<small>03_목표설정 · 44_프로젝션엔진</small></div>' +
+    '<div class="kpis">' +
     '<div class="kpi"><div class="k-l">2026 매출 목표</div><div class="k-v">80억</div>' +
     '<div class="k-s">1~8월 실적 ' + won(LX.status.company.revenue) + " · 계획 대비 " +
     pct(LX.status.company.achieve) + "</div></div>" +
@@ -323,26 +468,46 @@ function pGoal() {
     '<div class="k-s">매출의 25% · 현재 ' + won(LX.status.company.ebitda) + "</div></div>" +
     '<div class="kpi neg"><div class="k-l">현재 페이스 착지</div><div class="k-v">' +
     won(LX.status.landing[1].v) + '</div><div class="k-s">목표의 ' +
-    pct(LX.status.landing[1].v / g.target.revenue) + "</div></div></div>";
+    pct(LX.status.landing[1].v / g.target.revenue) + "</div></div>" +
+    '<div class="kpi neg"><div class="k-l">미커버 금액</div><div class="k-v">' +
+    won(LX.status.landing[4].v) + '</div><div class="k-s">과제를 다 성공시켜도 남는 금액</div></div></div>';
 
-  h += '<div class="card"><h2>사업전략 — 목표를 어떻게 달성하는가</h2>' +
-    '<p class="sec-d">숫자 목표만 있고 경로가 없으면 전략과제를 만들 수 없습니다. ' +
-    "80억이라는 숫자는 아래 네 가지가 성립할 때만 가능한 숫자입니다.</p>";
-  g.strategy.forEach(function (s) {
-    h += '<div class="act"><div class="act-h"><span class="act-id">' + esc(s.id) + "</span>" +
-      "<b>" + esc(s.name) + '</b><span class="bg bg-gy">' + esc(s.owner) + "</span></div>" +
-      '<div class="act-b">' + lk(s.why) + '<p class="tiny" style="margin:7px 0 0">검증 지점 — ' +
-      esc(s.link) + "</p></div></div>";
-  });
-  h += "</div>";
+  /* ── 사업전략 (02_전략기준 원문) ── */
+  h += '<div class="sec-title">사업전략<small>02_전략기준 STR-01~05 원문</small></div>' +
+    '<div class="card"><p class="sec-d">사업영역별로 전략·CSF·핵심 드라이버·KPI가 한 줄로 묶여 있습니다. ' +
+    "이 사이트의 모든 KPI는 이 표의 KPI ID로 연결됩니다.</p>" +
+    '<div class="tw"><table><thead><tr><th>ID</th><th>사업영역</th><th>전략</th>' +
+    "<th>CSF</th><th>핵심 드라이버</th><th>KPI</th></tr></thead><tbody>" +
+    g.strategy.map(function (s) {
+      return "<tr><td><b>" + esc(s.id) + '</b><span class="mini">' + esc(s.mvc) +
+        '</span></td><td class="nowrap small">' + esc(s.seg) + "</td><td>" + esc(s.name) +
+        '</td><td class="small">' + esc(s.csf) + '</td><td class="small muted">' +
+        esc(s.driver) + '</td><td class="small muted nowrap">' + esc(s.kpi) + "</td></tr>";
+    }).join("") + "</tbody></table></div></div>";
+
+  h += '<div class="banner b-amber"><b>' + esc(g.caution.t) + "</b>" + g.caution.d + "</div>";
 
   h += '<div class="banner b-red"><b>지금 이 목표는 성립하지 않습니다</b>' +
     "80억 중 " + won(Math.abs(LX.status.gap.roots[0].v)) + "(" + pct(LX.status.gap.roots[0].s) +
-    ")가 가맹에서 나오게 설계되어 있는데, 가맹 개시 게이트 9개 중 통과한 것이 0개입니다. " +
-    "그중 4개는 측정조차 시작되지 않았습니다. 목표를 낮추거나 게이트를 통과시키거나 둘 중 하나입니다.</div>";
+    ")가 가맹에서 나오게 설계되어 있는데, 가맹 개시 조건 9가지 중 충족된 것이 0개입니다. " +
+    "그중 4개는 측정조차 시작되지 않았습니다. 목표를 낮추거나 조건을 충족시키거나 둘 중 하나입니다.</div>";
+
+  /* ── 목표 분해 트리 ── */
+  var tr = g.tree;
+  h += '<div class="sec-title">목표는 무엇으로 만들어지는가<small>매출 80억 · EBITDA 20억의 분해</small></div>' +
+    '<div class="card"><p class="sec-d">' + esc(tr.note) + "</p>" +
+    treeBox("매출", "점포 수 × 점포당 매출 = 매장운영 매출", tr.rev) +
+    '<div style="height:16px"></div>' +
+    treeBox("EBITDA", "관리 영업손익 + 감가상각비", tr.ebi) +
+    '<div class="banner b-red" style="margin:18px 0 0"><b>이 트리에서 읽어야 할 것</b>' +
+    "매출을 쪼개는 축(주문 건수 · 방문자 수 · 주문율 · 객단가 · 거래처 수)이 <b>전부 빨간색</b>입니다. " +
+    "비용을 쪼개는 축만 초록색입니다. 그래서 지금 이 대장에서 나오는 과제는 전부 비용을 줄이는 과제이고, " +
+    "매출을 올리는 과제는 '점포당 매출을 올린다'는 문장 이상으로 구체화될 수 없습니다. " +
+    "무엇을 올릴지 모르기 때문입니다. 이것이 P-000(운영지표 수집 체계)이 0순위인 이유입니다.</div></div>";
 
   /* ── 사업 분류 체계 ── */
-  h += '<div class="card"><h2>사업 분류 체계</h2>' +
+  h += '<div class="sec-title">사업 분류 체계<small>44_프로젝션엔진 §A</small></div>' +
+    '<div class="card">' +
     '<p class="sec-d">모든 화면·표·차트가 이 다섯(가맹 포함 여섯) 단위로만 쪼개집니다. ' +
     "44_프로젝션엔진 §A의 사업계층과 같습니다.</p>";
   LX.goal.structure.forEach(function (d, di) {
@@ -360,29 +525,42 @@ function pGoal() {
 
   /* ── 월별 상승 기조 ── */
   var r = LX.goal.ramp;
-  h += '<div class="card"><h2>2026 월별 상승 기조 — 전사</h2>' +
-    '<p class="sec-d">' + esc(r.note) + "</p>" +
-    lineBox("rampC", [
-      { name: "계획", color: "#98a1aa", data: r.plan, dash: true, thin: true },
-      { name: "실적", color: "#15293e", data: r.actual, fill: "rgba(21,41,62,.06)" }
-    ], "6월에 계획이 2.9배로 뛰는 것은 가맹 개설매출 5.1억이 들어가기 때문입니다. 가맹이 열리지 않으면 이 계획선은 6월 이후 전부 미달로 남습니다.") +
-    "</div>";
+  h += '<div class="sec-title">2026 월별 상승 기조<small>차트의 점에 마우스를 올리면 그 달의 숫자와 사유가 나옵니다</small></div>' +
+    '<div class="grid2">' +
+    '<div class="card" style="margin:0"><h2>매출 — 계획과 실적</h2>' +
+    '<p class="sec-d">' + esc(r.note) + "</p>" + lineBox("rampC", rampSeries()) + "</div>" +
+    '<div class="card" style="margin:0"><h2>EBITDA — 목표와 실적</h2>' +
+    '<p class="sec-d">목표선은 그 달 매출계획의 25%입니다. 실적은 8개월 내내 목표선 아래이고 3월부터는 0선 아래입니다.</p>' +
+    lineBox("ebiC", ebiSeries()) + "</div></div>" +
+    '<div class="card"><p class="tiny" style="margin:0">' + esc(r.ebitdaNote) + "</p></div>";
 
   var rows = r.plan.map(function (p, i) {
-    var a = r.actual[i];
+    var a = r.actual[i], ep = r.ebitdaPlan[i], ea = r.ebitdaAct[i];
     return [LX.meta.months[i], won(p), a === null ? "—" : won(a),
-      a === null ? "—" : (a - p < 0 ? "−" : "+") + won(Math.abs(a - p)),
-      a === null ? "—" : pct(a / p, 0)];
+      a === null ? "—" : pct(a / p, 0), won(ep), ea === null ? "—" : won(ea)];
   });
   h += '<div class="card"><h2>월별 계획 대 실적</h2>' +
-    tbl(["월", "계획", "실적", "차이", "달성률"], rows) + "</div>";
+    tbl(["월", "매출 계획", "매출 실적", "달성률", "EBITDA 목표", "EBITDA 실적"], rows) + "</div>";
   return h;
 }
+function rampSeries() {
+  var r = LX.goal.ramp;
+  return [
+    { name: "계획", color: "#9CA3AF", data: r.plan, dash: true, thin: true },
+    { name: "실적", color: "#1E3A5F", data: r.actual, fill: "rgba(30,58,95,.07)" }
+  ];
+}
+function ebiSeries() {
+  var r = LX.goal.ramp;
+  return [
+    { name: "목표 (매출계획 × 25%)", color: "#9CA3AF", data: r.ebitdaPlan, dash: true, thin: true },
+    { name: "실적", color: "#B03A2E", data: r.ebitdaAct, fill: "rgba(176,58,46,.07)" }
+  ];
+}
 function pGoalAfter() {
-  line("rampC", [
-    { name: "계획", color: "#98a1aa", data: LX.goal.ramp.plan, dash: true, thin: true },
-    { name: "실적", color: "#15293e", data: LX.goal.ramp.actual, fill: "rgba(21,41,62,.06)" }
-  ], LX.meta.months, { h: 280 });
+  var M = LX.meta.months, n = LX.goal.ramp.notes;
+  line("rampC", rampSeries(), M, { h: 250, notes: n });
+  line("ebiC", ebiSeries(), M, { h: 250, notes: n });
 }
 
 /* ══ ② 세부사업영역별 현황 ═══════════════ */
@@ -394,16 +572,27 @@ function bizSeries(s) {
   fc12[s.act.length - 1] = s.act[s.act.length - 1];
   s.fcst.forEach(function (v, i) { fc12[s.act.length + i] = v; });
   return [
-    { name: "계획", color: "#98a1aa", data: s.plan, dash: true, thin: true },
-    { name: "실적 (1~8월)", color: s.color, data: act12, fill: "rgba(21,41,62,.05)" },
-    { name: "예측 (9~12월)", color: s.color, data: fc12, dash: true }
+    { name: "매출 계획", color: "#9CA3AF", data: s.plan, dash: true, thin: true },
+    { name: "매출 실적 (1~8월)", color: s.color, data: act12, fill: "rgba(30,58,95,.06)" },
+    { name: "매출 예측 (9~12월)", color: s.color, data: fc12, dash: true }
+  ];
+}
+/* 손익 — 목표선은 그 달 매출계획 × 25% */
+function bizOpSeries(s) {
+  var tgt = s.plan.map(function (p) { return p * 0.25; });
+  var act = s.op.concat([null, null, null, null]);
+  return [
+    { name: "목표 (매출계획 × 25%)", color: "#9CA3AF", data: tgt, dash: true, thin: true },
+    { name: "관리 영업손익 실적", color: "#B03A2E", data: act, fill: "rgba(176,58,46,.06)" }
   ];
 }
 
 function pBiz() {
   var B = LX.biz, M = LX.meta.months;
   var h = '<div class="banner b-blue"><b>이 화면을 읽는 법</b>' + esc(B.note) + " " +
-    esc(B.fcstHow) + "</div>";
+    esc(B.fcstHow) + "</div>" +
+    '<div class="banner b-amber"><b>손익 차트의 목표선</b>' + esc(B.opNote) +
+    "<br><br><b style=\"display:inline\">손익의 기준</b> " + esc(B.opBasis) + "</div>";
 
   /* 요약 표 */
   h += '<div class="card"><h2>다섯 사업 한눈에</h2>' +
@@ -433,12 +622,20 @@ function pBiz() {
       '<span class="dx-dot" style="background:' + s.color + '"></span>' +
       '<b>' + esc(s.name) + '</b><span class="dx-div">' + esc(s.div) + "</span>" + badge +
       "</div><div class=\"dx-body\">" +
-      lineBox("bz_" + s.key, bizSeries(s), null) +
+      '<div class="grid2"><div>' + lineBox("bz_" + s.key, bizSeries(s), null) + "</div>" +
+      "<div>" + lineBox("bo_" + s.key, bizOpSeries(s), null) + "</div></div>" +
       '<div class="dx-pc">' +
       '<div class="dx-lb p">문제</div><div class="v"><b>' + esc(s.problem) + "</b></div>" +
       '<div class="dx-lb c">원인</div><div class="v">' + lk(s.cause) + "</div>" +
       '<div class="dx-lb s">덧붙임</div><div class="v sub">' + lk(s.sub) + "</div>" +
-      "</div></div>" +
+      "</div>" +
+      (s.rental
+        ? '<h3 style="margin:20px 0 6px;font-size:13.5px;font-weight:800">' + esc(s.rental.t) + "</h3>" +
+          '<p class="sec-d" style="margin-bottom:10px">' + esc(s.rental.d) + "</p>" +
+          tbl(s.rental.head, s.rental.rows) +
+          '<div class="banner b-red" style="margin:12px 0 0">' + esc(s.rental.after) + "</div>"
+        : "") +
+      "</div>" +
       '<div class="dx-kpi">' +
       "<div><span>1~8월 매출</span><b>" + won(sg.rev || 0) + "</b></div>" +
       "<div><span>관리 영업손익</span><b class=\"" + sgn(sg.op || 0) + '">' + won(sg.op || 0) + "</b></div>" +
@@ -462,7 +659,8 @@ function pBiz() {
 function pBizAfter() {
   var M = LX.meta.months;
   LX.biz.segs.forEach(function (s) {
-    line("bz_" + s.key, bizSeries(s), M, { h: 250, split: 7 });
+    line("bz_" + s.key, bizSeries(s), M, { h: 230, split: 7 });
+    line("bo_" + s.key, bizOpSeries(s), M, { h: 230, split: 7 });
   });
 }
 
@@ -528,7 +726,7 @@ function pCsf() {
   h += '<div class="banner b-blue"><b>가맹사업에는 CSF를 아직 쓸 수 없습니다</b>' +
     "가맹은 무인직영의 단위경제가 증명된 뒤에야 성립하는 사업입니다. " +
     "무인직영 CSF가 달성되기 전에 가맹 CSF를 세우면 선후가 뒤집힙니다. " +
-    "대신 게이트 9개가 그 자리를 대신합니다.</div>";
+    "대신 조건 9가지가 그 자리를 대신합니다.</div>";
   return h;
 }
 
@@ -660,7 +858,7 @@ function pGates() {
     won(Math.abs(LX.status.gap.roots[0].v)) + '</div><div class="k-s">목표 간격의 ' +
     pct(LX.status.gap.roots[0].s) + "</div></div></div>";
   h += '<p class="sec-d">' + esc(g.note) + "</p>";
-  h += '<div class="card">' + '<div class="tw"><table><thead><tr><th>게이트</th><th>통과 기준</th>' +
+  h += '<div class="card">' + '<div class="tw"><table><thead><tr><th>조건</th><th>통과 기준</th>' +
     '<th class="num">현재</th><th class="num">판정</th></tr></thead><tbody>' +
     g.rows.map(function (r) {
       var cls = r.st === "통과" ? "bg-ok" : r.st === "미달" ? "bg-no" : "bg-wa";
@@ -813,8 +1011,12 @@ function pGap() {
 }
 
 function pStores() {
-  var h = '<p class="sec-d">금액만으로는 점포를 비교할 수 없습니다. 매출 규모가 다르기 때문입니다. ' +
-    "비율로 보아야 어느 점포의 어떤 항목이 튀는지 보입니다. 붉을수록 나쁩니다.</p>";
+  var h = '<div class="banner b-amber"><b>표의 퍼센트는 전부 \'그 점포의 1~8월 매출 대비\'입니다</b>' +
+    "예를 들어 성수의 임차료 36.7%는 <b>성수 매출 1억 1,029만 대비 임차료 4,042만</b>이라는 뜻입니다. " +
+    "전사 매출이나 사업 합계 대비가 아닙니다. 맨 오른쪽 영업이익률만 관리 기준 손익 ÷ 그 점포 매출입니다. " +
+    "칸이 붉을수록 매출 대비 비중이 큽니다 — 12% 이상부터 색이 붙고 40% 이상이 가장 진합니다.</div>" +
+    '<p class="sec-d">금액만으로는 점포를 비교할 수 없습니다. 매출 규모가 다르기 때문입니다. ' +
+    "비율로 보아야 어느 점포의 어떤 항목이 튀는지 보입니다.</p>";
 
   ["man", "unm", "inv"].forEach(function (k) {
     var d = LX.storeDetail[k]; if (!d) return;
@@ -833,8 +1035,8 @@ function pStores() {
         ? [["mat", "원재료"], ["lab", "인건비"], ["rent", "임차료"], ["dep", "감가상각"], ["bld", "건물관리"], ["lease", "기계렌탈"]]
         : [["mat", "원재료"], ["lab", "인건비"], ["rent", "임차료"], ["fee", "위탁수수료"], ["bld", "건물관리"]];
       h += '<div class="tw"><table class="heat"><thead><tr><th>점포</th><th class="num">매출</th>' +
-        keys.map(function (c) { return '<th class="num">' + c[1] + "</th>"; }).join("") +
-        '<th class="num">영업이익률</th></tr></thead><tbody>' +
+        keys.map(function (c) { return '<th class="num">' + c[1] + "<br>÷ 그 점포 매출</th>"; }).join("") +
+        '<th class="num">영업이익률<br>÷ 그 점포 매출</th></tr></thead><tbody>' +
         d.rows.map(function (r) {
           var cells = keys.map(function (c) {
             var p = r.rev ? r[c[0]] / r.rev : 0;
@@ -875,7 +1077,7 @@ function pLanding() {
   h += '<div class="banner b-red"><b>결론</b>' +
     "현재 제안된 과제를 전부 성공시켜도 목표의 " + pct(L[3].v / LX.goal.target.revenue) +
     "에 머무릅니다. 남는 " + won(L[4].v) + "은 과제로 메울 수 있는 크기가 아닙니다. " +
-    "선택지는 둘입니다 — <b>가맹 게이트를 통과시켜 가맹을 열거나</b>, <b>목표를 현실적으로 다시 세우거나</b>. " +
+    "선택지는 둘입니다 — <b>가맹 개시 조건 9가지를 충족시켜 가맹을 열거나</b>, <b>목표를 현실적으로 다시 세우거나</b>. " +
     "이 결정은 이 사이트가 아니라 경영진 회의에서 해야 합니다.</div>";
   return h;
 }
@@ -918,8 +1120,22 @@ function wbVerdict(r, c) {
 function pPlan() {
   var W = LX.work;
   var h = '<div class="banner b-blue"><b>이 화면은 계산기입니다</b>' +
-    "점포마다 유형을 고르면 목표와 판정이 즉시 다시 계산됩니다. 선택은 이 브라우저에 저장되므로 " +
+    "점포마다 유형을 고르면 목표와 판정이 즉시 다시 계산됩니다. 점포 이름이나 '그래프 확인'을 누르면 " +
+    "그 점포의 현재 월매출과 목표 월매출이 막대로 비교됩니다. 선택은 이 브라우저에 저장되므로 " +
     "다시 열어도 유지되고, 회의 중에 바꿔 가며 볼 수 있습니다.</div>";
+
+  h += '<div class="card"><h2>이 화면에서 쓰는 용어</h2>' +
+    '<p class="sec-d">아래 넷은 이 대장에서 새로 만든 말입니다. 정의와 계산식을 먼저 맞춰 두어야 회의에서 다른 뜻으로 쓰이지 않습니다.</p>' +
+    defBox([
+      { n: "자리값", f: "자리값 = 지급임차료원가 + 건물관리비",
+        e: "그 자리를 쓰는 대가로 매달 나가는 돈입니다. 임차료만 보면 원그로브처럼 임차료 0원인 입점형 점포를 놓치므로 건물관리비를 합쳐서 봅니다." },
+      { n: "공헌이익률", f: "공헌이익률 = (매출 − 변동비) ÷ 매출",
+        e: "매출 1원을 더 팔 때 고정비를 덮는 데 쓸 수 있는 비율입니다. 변동비는 원재료원가 + 매출연동 수수료(위탁운영·위탁·매출·판매·카드·상표)입니다. ★인건비는 고정비로 봅니다 — 매출이 줄어도 줄지 않는 현재 구조를 보수적으로 반영한 것이며, 반변동비로 보면 배수가 내려갑니다." },
+      { n: "자리값 배수", f: "자리값 배수 = 매출 ÷ 자리값",
+        e: "'이 자리를 쓰려면 자리값의 몇 배를 팔아야 하는가'를 한 숫자로 본 것입니다. 목표값(필요 배수) = 손익분기 매출 ÷ 자리값이고, 스코어(현재 배수) = 실제 매출 ÷ 자리값입니다. 점포마다 공헌이익률과 다른 고정비가 달라 필요 배수도 점포마다 다릅니다." },
+      { n: "로봇비용 배수", f: "로봇비용 배수 = 매출 ÷ (기계렌탈 + 감가상각비 + 위탁운영수수료 + 위탁수수료)",
+        e: "세 모델이 로봇 값을 내는 방식이 8% / 정액 / 20%로 달라 그대로는 비교되지 않으므로 네 계정을 묶었습니다. ★기준선 5배 — 투자모델 계약이 매출의 20%이므로 그 역수입니다. 5배 미만이면 투자모델보다 불리한 조건으로 로봇을 쓰고 있다는 뜻입니다." }
+    ]) + "</div>";
 
   h += '<div class="card"><h2>1단계 — 바꿀 수 없는 것을 먼저 고정합니다</h2>' +
     '<p class="sec-d">' + lk(W.fixedNote) + "</p>" +
@@ -1010,7 +1226,7 @@ function wbRender() {
   h += '<div class="tw"><table><thead><tr><th>점포</th><th>사업</th><th>유형 선택</th>' +
     '<th class="num">자리값(월)</th><th class="num">로봇 대가(월)</th><th class="num">고정비(월)</th>' +
     '<th class="num">공헌이익률</th><th class="num">현재 월매출</th><th class="num">목표 월매출</th>' +
-    '<th class="num">배수</th><th>판정 · 목표</th></tr></thead><tbody>';
+    '<th class="num">배수</th><th>판정 · 목표</th><th>비고</th></tr></thead><tbody>';
 
   ["유인직영", "무인직영", "투자모델"].forEach(function (seg) {
     rows.filter(function (x) { return x.row.seg === seg; }).forEach(function (x, i) {
@@ -1019,7 +1235,7 @@ function wbRender() {
       var visit = Math.max(0, -c.op) / 30 / (WB.adv || 1);
       var cls = v.k === "cut" ? "row-cut" : isSc ? "row-sc" : "";
       h += "<tr" + (cls ? ' class="' + cls + '"' : "") + (i === 0 ? "" : "") + ">" +
-        "<td><b>" + esc(row.s) + "</b>" +
+        '<td><button class="dt" data-dk="store:' + esc(row.s) + '"><b>' + esc(row.s) + "</b></button>" +
         (row.note ? '<span class="mini">' + esc(row.note) + "</span>" : "") + "</td>" +
         '<td class="small muted nowrap">' + esc(row.seg) + "</td>" +
         '<td><select class="pick' + (isSc ? " sc" : "") + '" data-s="' + esc(row.s) + '">' +
@@ -1042,7 +1258,8 @@ function wbRender() {
           : '<span class="mini">' + (c.mult === null ? "" :
               c.mult <= 1 ? "여유 " + won(c.mRev - c.tgt) + "/월"
               : "부족 " + won(c.tgt - c.mRev) + "/월 (+" + pct(c.mult - 1, 0) + ")") + "</span>") +
-        "</td></tr>";
+        '</td><td><button class="btn-g" data-dk="store:' + esc(row.s) +
+        '">그래프 확인</button></td></tr>';
     });
   });
   h += "</tbody></table></div>";
@@ -1286,19 +1503,24 @@ function pTabs() {
 var AFTER = { goal: pGoalAfter, biz: pBizAfter, now: pNowAfter, plan: wbRender };
 
 function buildNav(cur) {
-  var h = "";
-  PHASES.forEach(function (p, i) {
-    var list = PAGES.filter(function (x) { return x.ph === i; });
-    if (!list.length) return;
-    var on = list.some(function (x) { return x.id === cur; });
-    h += '<div class="nav-phase' + (on ? " on" : "") + '"><div class="nav-ph-head">' +
-      '<span class="nav-ph-num">' + p.n + "</span>" + esc(p.t) + "</div>" +
-      list.map(function (x) {
-        return '<a class="nav-a' + (x.id === cur ? " on" : "") + '" href="#/' + x.id +
-          '"><span class="nd"></span>' + esc(x.t) + "</a>";
-      }).join("") + "</div>";
-  });
-  el("sideNav").innerHTML = h;
+  var page = PAGES.filter(function (x) { return x.id === cur; })[0] || PAGES[0];
+
+  /* 상단 — 단계 탭 */
+  el("mainNav").innerHTML = PHASES.map(function (p, i) {
+    var first = PAGES.filter(function (x) { return x.ph === i; })[0];
+    if (!first) return "";
+    return '<a class="navtab' + (page.ph === i ? " active" : "") + '" href="#/' + first.id +
+      '">' + esc(p.n + " " + p.t) + "</a>";
+  }).join("");
+
+  /* 좌측 — 현재 단계의 페이지 */
+  var list = PAGES.filter(function (x) { return x.ph === page.ph; });
+  el("sideNav").innerHTML =
+    '<div class="nav-ph-head">' + esc(PHASES[page.ph].n + " " + PHASES[page.ph].t) + "</div>" +
+    list.map(function (x) {
+      return '<a class="nav-a' + (x.id === cur ? " on" : "") + '" href="#/' + x.id + '">' +
+        esc(NAVLABEL[x.id] || x.t) + "</a>";
+    }).join("");
 }
 
 function route() {
@@ -1381,4 +1603,8 @@ if (document.readyState === "loading") document.addEventListener("DOMContentLoad
 else init();
 
 })();
+
+
+
+
 

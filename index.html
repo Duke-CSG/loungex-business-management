@@ -4,9 +4,10 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>라운지엑스 경영관리 루프</title>
-<meta name="description" content="목표수립 → CSF·KPI → 사업현황·분석 → 전략과제 → 지표리뷰">
+<meta name="description" content="목표수립 → 사업현황·분석 → 전략과제 → 실행관리·지표리뷰">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.css">
 <!-- v 값을 올리면 브라우저가 캐시를 버리고 새로 받습니다. 파일을 고칠 때마다 날짜를 바꾸십시오. -->
-<link rel="stylesheet" href="ledger.css?v=20260923b">
+<link rel="stylesheet" href="ledger.css?v=20260923c">
 </head>
 <body>
 
@@ -19,24 +20,19 @@ window.addEventListener("error", function (e) {
 </script>
 
 <header class="topbar">
-  <div class="topbar-in">
-    <button class="menu-btn" id="menuBtn" aria-label="메뉴">☰</button>
-    <a class="brand" href="#/goal">
-      <span class="brand-mark">LX</span>
-      <span class="brand-text">라운지엑스 <b>경영관리 루프</b></span>
-    </a>
-    <div class="topbar-right">
-      <span class="asof-chip" id="asofChip"></span>
-    </div>
-  </div>
+  <button class="menu-btn" id="menuBtn" aria-label="메뉴">☰</button>
+  <a class="brand" href="#/goal">
+    <span class="brand-mark">LX</span>
+    <span class="brand-title">경영관리 루프</span>
+  </a>
+  <nav class="mainnav" id="mainNav"></nav>
+  <span class="brand-sub" id="asofChip"></span>
 </header>
 
 <div class="shell">
   <aside class="side" id="side">
     <nav id="sideNav"></nav>
-    <div class="side-foot">
-      <p id="sideMeta"></p>
-    </div>
+    <div class="side-foot"><p id="sideMeta"></p></div>
   </aside>
   <div class="scrim" id="scrim"></div>
 
@@ -65,15 +61,15 @@ window.addEventListener("error", function (e) {
   </div>
 </noscript>
 
-<script src="data.js?v=20260923b"></script>
-<script src="data2.js?v=20260923b"></script>
-<script src="ledger.js?v=20260923b"></script>
+<script src="data.js?v=20260923c"></script>
+<script src="data2.js?v=20260923c"></script>
+<script src="ledger.js?v=20260923c"></script>
 
 <script>
 /* 렌더가 안 됐으면 원인을 화면에 띄웁니다. 빈 화면으로 끝나지 않게. */
 setTimeout(function () {
   var nav = document.getElementById("sideNav");
-  if (nav && nav.children.length) return;          // 정상
+  if (nav && nav.children.length) return;
   var box = document.getElementById("pageBody");
   var t = document.getElementById("pageTitle");
   if (t) t.textContent = "화면을 그리지 못했습니다";
@@ -88,9 +84,9 @@ setTimeout(function () {
   if (!why.length) why.push("원인을 특정하지 못했습니다. 브라우저 콘솔(F12)을 확인해 주십시오.");
   if (box) {
     box.innerHTML =
-      '<div style="background:#fdeced;border:1px solid #f4cfd1;border-left:4px solid #b4232a;border-radius:8px;padding:16px 20px;line-height:1.75">' +
-      "<b>원인</b><ul style=\"margin:8px 0 0;padding-left:18px\"><li>" + why.join("</li><li>") + "</li></ul>" +
-      '<p style="margin:14px 0 0"><b>가장 흔한 원인은 브라우저 캐시입니다.</b> ' +
+      '<div class="banner b-red"><b>원인</b><ul style="margin:6px 0 0"><li>' +
+      why.join("</li><li>") + "</li></ul>" +
+      '<p style="margin:12px 0 0"><b>가장 흔한 원인은 브라우저 캐시입니다.</b> ' +
       "Windows는 <code>Ctrl+Shift+R</code>, Mac은 <code>Cmd+Shift+R</code> 로 강력 새로고침해 보십시오. " +
       "그래도 같으면 저장소에 data.js · data2.js · ledger.js · ledger.css 네 파일이 모두 올라가 있는지 확인해 주십시오.</p></div>";
   }
@@ -98,7 +94,3 @@ setTimeout(function () {
 </script>
 </body>
 </html>
-
-
-
-
