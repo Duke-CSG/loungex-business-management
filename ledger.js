@@ -658,6 +658,21 @@ function rstBepBlock() {
   return h;
 }
 
+/* 점포당 월평균 매출 — 세 모델 + 목표선 + 마포 분할 보정 */
+function psSeries() {
+  var P = LX.perStore, S = P.series, T = P.target;
+  var flat = function (v) { return [v, v, v, v, v, v, v, v]; };
+  return [
+    { name: "유인직영 목표", color: "#C9CED4", data: flat(T.man), dash: true, thin: true },
+    { name: "유인직영", color: "#1F4E3D", data: S.man },
+    { name: "유인직영 (마포 분할 보정)", color: "#1E6B4F", data: S.manAdj, dash: true },
+    { name: "투자모델", color: "#C1440E", data: S.inv },
+    { name: "투자모델 목표", color: "#E3C3B4", data: flat(T.inv), dash: true, thin: true },
+    { name: "무인직영", color: "#9D0208", data: S.unm },
+    { name: "무인직영 목표", color: "#E5B9BA", data: flat(T.unm), dash: true, thin: true }
+  ];
+}
+
 function pBiz() {
   var B = LX.biz, M = LX.meta.months;
   var h = '<div class="banner b-blue"><b>이 화면을 읽는 법</b>' + esc(B.note) + " " +
@@ -722,6 +737,38 @@ function pBiz() {
       "</div></div>";
   });
 
+  /* 점포당 월평균 매출 */
+  if (LX.perStore) {
+    var P = LX.perStore;
+    h += '<div class="card"><h2>' + esc(P.t) + "</h2>" +
+      '<p class="sec-d">' + esc(P.d) + "</p>" +
+      '<div class="grid2">' +
+      "<div>" + lineBox("psA", psSeries(), "실선 = 공시 기준 · 회색 점선 = 목표(44 §E) · 초록 점선 = 유인직영 마포 분할 보정") + "</div>" +
+      '<div><div class="tw"><table><thead><tr><th>모델</th><th class="num">1~8월 매출</th>' +
+      '<th class="num">점포·월</th><th class="num">점포당 월평균</th><th class="num">목표</th>' +
+      '<th class="num">달성률</th></tr></thead><tbody>' +
+      P.avg.map(function (r) {
+        return "<tr><td><b>" + esc(r[0]) + '</b></td><td class="num">' + esc(r[1]) +
+          '</td><td class="num">' + esc(r[2]) + '</td><td class="num"><b>' + esc(r[3]) +
+          '</b></td><td class="num muted">' + esc(r[4]) + '</td><td class="num ' +
+          (r[5].indexOf("+") === 0 ? "pos" : "neg") + '">' + esc(r[5]) + "</td></tr>";
+      }).join("") + "</tbody></table></div></div></div>" +
+      '<div class="banner b-amber" style="margin:16px 0 0"><b>유인직영 — 7월 마포점 무인 전환</b>' +
+      esc(P.manNote) + "</div>" +
+      (P.conv
+        ? '<h3 style="margin:22px 0 6px;font-size:13.5px;font-weight:800">' + esc(P.conv.t) + "</h3>" +
+          '<p class="sec-d" style="margin-bottom:10px">' + esc(P.conv.d) + "</p>" +
+          tbl(["구분", "값", "비고"], P.conv.rows) +
+          '<div class="banner b-green" style="margin:12px 0 0"><b>이 전환이 중요한 이유</b>' +
+          P.conv.after + "</div>" +
+          '<div class="banner b-amber" style="margin-bottom:0">' + esc(P.conv.open) + "</div>"
+        : "") +
+      '<div class="banner b-amber"><b>투자모델 — 점포·월로 나눠야 하는 이유</b>' +
+      esc(P.invNote) + "</div>" +
+      '<div class="banner b-blue" style="margin-bottom:0"><b>이 표에서 읽어야 할 것</b>' +
+      P.after + "</div></div>";
+  }
+
   /* 각주 인사이트 */
   h += '<div class="card"><h2>각주 — 이 화면에서 읽어야 할 것</h2>' +
     '<p class="sec-d">표와 차트만 보면 놓치는 것들입니다. 회의에서 결론이 갈리는 지점이 여기입니다.</p>';
@@ -740,6 +787,7 @@ function pBizAfter() {
     line("bz_" + s.key, bizSeries(s), M, { h: 230, split: 7, notes: N[s.key] });
     line("bo_" + s.key, bizOpSeries(s), M, { h: 230, split: 7, notes: N[s.key] });
   });
+  if (LX.perStore) line("psA", psSeries(), M.slice(0, 8), { h: 300 });
 }
 
 /* ══ ② CSF · KPI ═══════════════════════════ */
@@ -2105,6 +2153,7 @@ if (document.readyState === "loading") document.addEventListener("DOMContentLoad
 else init();
 
 })();
+
 
 
 
