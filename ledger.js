@@ -419,7 +419,7 @@ var NAVLABEL = {
   stores: "점포 비교", landing: "착지 전망", plan: "점포 목표 설정", csf: "CSF · KPI",
   capa: "로스터리 CAPA", tasks: "전략과제", board: "실행관리", review: "지표리뷰", loop: "루프 규칙",
   tree: "지표 체계", bep: "배수 계산 근거", gates: "가맹사업 시작 요건",
-  pl: "관리손익이란", shared: "상품·제품 비용분담", trust: "숫자 신뢰도", tabs: "대장 탭 지도"
+  roast: "로스터리 관리회계", pl: "관리손익이란", shared: "상품·제품 비용분담", trust: "숫자 신뢰도", tabs: "대장 탭 지도"
 };
 
 var PAGES = [
@@ -459,6 +459,8 @@ var PAGES = [
     s: "③의 목표 월매출이 어떻게 나왔는지, 로봇비용 배수와 로스터리 적용까지.", f: pBep },
   { ph: 4, id: "gates",  t: "가맹사업 시작 요건 9가지",
     s: "무인직영 CSF의 측정 도구이자 가맹 개시의 선행조건입니다.", f: pGates },
+  { ph: 4, id: "roast",  t: "로스터리 관리회계 — 사내대체가격 설계",
+    s: "생산량의 69%가 LX 매장으로 가는데 내부거래라 매출로 잡히지 않습니다. 고정비는 전량을 만드는 데 들어가는데 매출은 31%분만 인식됩니다. 그 왜곡을 가상 숫자 없이 바로잡는 기준입니다.", f: pRoast },
   { ph: 4, id: "pl",     t: "관리손익이란",
     s: "왜 원본 영업손익을 그대로 쓰지 않는가.", f: pPL },
   { ph: 4, id: "shared", t: "상품과 제품의 비용 분담",
@@ -726,6 +728,17 @@ function pBiz() {
           '<p class="sec-d" style="margin-bottom:10px">' + esc(LX.unmFcst.d) + "</p>" +
           tbl(["항목", "금액", "산출 근거"], LX.unmFcst.rows) +
           '<div class="banner b-amber" style="margin:12px 0 0">' + esc(LX.unmFcst.caveat) + "</div>"
+        : "") +
+      (s.key === "rst" && LX.roastMA
+        ? '<div class="banner b-blue" style="margin:20px 0 0"><b>★이 −2,458만은 로스터리 사업의 실상이 아닙니다</b>' +
+          "로스터리는 월 1,600kg을 볶는데 그중 <b>1,100kg(68.75%)이 LX 매장으로</b> 갑니다. " +
+          "마진을 붙이지 않고 내부거래라 매출로 잡지 않으므로, 고정비 전액을 B2B 500kg분 매출로만 덮게 됩니다.<br><br>" +
+          '<span class="ma-cmp"><span><em>① 재무회계 (외부 보고)</em><b class="neg">연 −3,686만</b></span>' +
+          '<span><em>② 관리회계 (사내대체 반영)</em><b class="pos">연 +3,166만</b></span>' +
+          '<span><em>③ 내재화 이익 (직접 볶는 가치)</em><b class="pos">연 +8,172만</b></span></span>' +
+          "사내대체가격은 kg당 <b>21,809원</b>(제조변동비 16,618 + 고정비 5,191)이고 마진 0입니다. " +
+          "다만 이렇게 바꾸면 <b>매장이 월 571만을 더 지게 됩니다</b>(전사 합계는 불변). " +
+          '설계 전문은 <a href="#/roast">부록 · 로스터리 관리회계</a>에 있습니다.</div>'
         : "") +
       (s.key === "rst" && LX.rstBep ? rstBepBlock() : "") +
       "</div>" +
@@ -1928,6 +1941,79 @@ function pLoop() {
 }
 
 /* ══ 부록 ══════════════════════════════════ */
+/* ══ 로스터리 관리회계 ═══════════════════════ */
+function pRoast() {
+  var R = LX.roastMA; if (!R) return "<p>데이터 없음</p>";
+
+  var h = '<div class="kpis">' +
+    '<div class="kpi neg"><div class="k-l">① 재무회계 — 연환산</div><div class="k-v">−3,686만</div>' +
+    '<div class="k-s">매출의 69%가 장부에 안 보이는 상태</div></div>' +
+    '<div class="kpi pos"><div class="k-l">② 관리회계 — 연환산</div><div class="k-v">+3,166만</div>' +
+    '<div class="k-s">사내대체 반영 · 사업 건전성 판단용</div></div>' +
+    '<div class="kpi pos"><div class="k-l">③ 내재화 이익 — 연환산</div><div class="k-v">+8,172만</div>' +
+    '<div class="k-s">직접 볶아서 아끼는 금액(시장가 28,000원 가정)</div></div>' +
+    '<div class="kpi neg"><div class="k-l">매장이 지게 될 원가</div><div class="k-v">월 571만</div>' +
+    '<div class="k-s">점포당 월 44만 · 전사 손익은 불변</div></div></div>';
+
+  h += '<div class="card"><h2>왜 별도 기준이 필요한가</h2>' +
+    "<p>" + esc(R.lead) + "</p>" +
+    '<div class="banner b-amber" style="margin:14px 0 0">' + esc(R.point) + "</div></div>";
+
+  h += '<div class="card"><h2>' + esc(R.unitT) + "</h2>" +
+    tbl(["항목", "값", "산출 · 비고"], R.unit) +
+    '<div class="banner b-blue" style="margin:14px 0 0"><b>고정비를 1,600kg 전체로 나눕니다</b>' +
+    esc(R.unitNote) + "</div></div>";
+
+  h += '<div class="card"><h2>' + esc(R.plT) + "</h2>" +
+    '<p class="sec-d">' + esc(R.plD) + "</p>" +
+    '<div class="tw"><table><thead><tr>' +
+    R.plHead.map(function (x, i) { return "<th" + (i >= 1 && i <= 3 ? ' class="num"' : "") + ">" + esc(x) + "</th>"; }).join("") +
+    "</tr></thead><tbody>" +
+    R.pl.map(function (r) {
+      var tot = r[0].indexOf("▸▸") === 0;
+      return "<tr" + (tot ? ' class="tot"' : "") + "><td><b>" + esc(r[0]) + "</b></td>" +
+        '<td class="num' + (r[1].indexOf("−") === 0 ? " neg" : "") + '">' + esc(r[1]) + "</td>" +
+        '<td class="num' + (r[2].indexOf("+") === 0 ? " pos" : "") + '">' + esc(r[2]) + "</td>" +
+        '<td class="num' + (r[3].indexOf("+") === 0 ? " pos" : " muted") + '">' + esc(r[3]) + "</td>" +
+        '<td class="small muted">' + esc(r[4]) + "</td></tr>";
+    }).join("") + "</tbody></table></div>" +
+    '<div class="banner b-green" style="margin:14px 0 0"><b>②의 흑자는 어디서 오나</b>' + R.plAfter + "</div></div>";
+
+  h += '<div class="card"><h2>' + esc(R.makeT) + "</h2>" +
+    '<p class="sec-d">' + esc(R.makeD) + "</p>" + tbl(R.makeHead, R.make) +
+    '<div class="banner b-amber" style="margin:14px 0 0">' + esc(R.makeNote) + "</div></div>";
+
+  h += '<div class="card"><h2>' + esc(R.tpT) + "</h2>" +
+    '<div class="tw"><table><thead><tr>' +
+    R.tpHead.map(function (x) { return "<th>" + esc(x) + "</th>"; }).join("") +
+    "</tr></thead><tbody>" +
+    R.tp.map(function (r, i) {
+      return "<tr" + (i === 1 ? ' class="tot"' : "") + "><td><b>" + esc(r[0]) + "</b></td>" +
+        '<td class="nowrap">' + esc(r[1]) + '</td><td class="small">' + esc(r[2]) +
+        '</td><td class="small">' + esc(r[3]) + '</td><td class="small muted">' + esc(r[4]) + "</td></tr>";
+    }).join("") + "</tbody></table></div>" +
+    '<div class="banner b-green" style="margin:16px 0 0"><b>결론</b>' + R.verdict1 + "</div>" +
+    '<div class="banner b-red"><b>두 번째 방안을 권하지 않는 이유</b>' + R.verdict2 + "</div></div>";
+
+  h += '<div class="card"><h2>' + esc(R.storeT) + "</h2>" +
+    '<p class="sec-d">' + esc(R.storeD) + "</p>" +
+    tbl(["항목", "금액", "설명"], R.store) +
+    '<div class="banner b-red" style="margin:14px 0 0">' + R.storeWarn + "</div></div>";
+
+  h += '<div class="card"><h2>이 기준을 쓰기 전에 확인해야 하는 것</h2>' +
+    '<div class="tw"><table><thead><tr>' +
+    R.openHead.map(function (x, i) { return "<th" + (i === 0 ? ' class="num"' : "") + ">" + esc(x) + "</th>"; }).join("") +
+    "</tr></thead><tbody>" +
+    R.open.map(function (r) {
+      return '<tr><td class="num"><b>' + esc(r[0]) + "</b></td><td><b>" + esc(r[1]) + "</b></td>" +
+        '<td class="small muted">' + esc(r[2]) + '</td><td class="small nowrap">' + esc(r[3]) +
+        '</td><td class="nowrap"><span class="bg ' +
+        (r[4].indexOf("✔") === 0 ? "bg-ok" : "bg-no") + '">' + esc(r[4]) + "</span></td></tr>";
+    }).join("") + "</tbody></table></div>" +
+    '<p class="tiny" style="margin:12px 0 0">' + esc(R.ledger) + "</p></div>";
+  return h;
+}
+
 function pPL() {
   var h = "";
   if (LX.mgmtPL && LX.mgmtPL.blocks) {
@@ -2153,6 +2239,7 @@ if (document.readyState === "loading") document.addEventListener("DOMContentLoad
 else init();
 
 })();
+
 
 
 
