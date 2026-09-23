@@ -1556,35 +1556,86 @@ function pTasks() {
 
   h += '<p class="sec-d">' + esc(P.note) + " 원인별로 묶었습니다.</p>";
 
-  ["gate", "measure", "cost"].forEach(function (rk) {
-    var rows = P.rows.filter(function (r) { return r.root === rk; });
-    if (!rows.length) return;
-    h += '<div class="card"><h2>원인 — ' + esc(rootName[rk] || rk) + "</h2>";
-    rows.forEach(function (a) {
-      h += '<div class="act' + (a.top ? " top" : "") + '">' +
-        '<div class="act-h"><span class="act-id">' + esc(a.id) + "</span>" +
-        "<b>" + esc(a.name) + "</b>" +
-        '<span class="bg bg-gy">' + esc(a.lever) + "</span>" +
-        '<span class="bg ' + (a.hold ? "bg-wa\">보류" : "bg-bl\">" + esc(a.status)) + "</span></div>" +
-        '<dl class="act-g">' +
-        '<dt>대상 사업</dt><dd>' + esc(a.seg) + "</dd>" +
-        "<dt>담당</dt><dd>" + esc(a.owner) +
-        (a.owner.indexOf("·") >= 0 || /[가-힣]{2,4}$/.test(a.owner) === false
-          ? '<span class="mini">★부서명입니다. 개인 이름으로 바꿔야 \'승인\'으로 넘어갑니다</span>' : "") + "</dd>" +
-        "<dt>기한</dt><dd>" + esc(a.due) + "</dd>" +
-        "<dt>올해 실현 기대 — 매출</dt><dd>" + (a.revT ? "<b>" + won(a.revT) + "</b>" : "—") + "</dd>" +
-        "<dt>연환산 기대효과 — 손익</dt><dd>" + (a.opY ? "<b>" + won(a.opY) + "</b>" : "—") + "</dd>" +
-        "<dt>기대효과 산출 근거</dt><dd>" + lk(a.basis) + "</dd>" +
-        "<dt>실현 측정지표</dt><dd>" + esc(a.metric) + "</dd>" +
-        "</dl></div>";
-    });
-    h += "</div>";
-  });
+  h += '<div class="card"><h2>과제 우선순위 — 회의 중에 끌어서 바꿉니다</h2>' +
+    '<p class="sec-d">티켓을 끌어 올리거나 내리면 순위가 바뀌고 이 브라우저에 저장됩니다. ' +
+    "제목을 누르면 상세가 펼쳐집니다. 회의에서 정한 순서 그대로 40_이슈관리의 '검토 우선순위' 열에 옮겨 적으십시오.</p>" +
+    '<div class="tk-bar"><button class="btn-g" id="tkReset">순서 초기화</button>' +
+    '<span class="tiny" id="tkState"></span></div>' +
+    '<div id="tkList"></div></div>';
 
   h += '<div class="banner b-red"><b>담당이 부서로 되어 있습니다</b>' +
     "'경영기획', '매장운영'은 사람이 아닙니다. 부서가 담당인 과제는 아무도 담당이 아닙니다. " +
-    "첫 회의에서 열 개 전부 <b>개인 이름</b>으로 바꾸고 42_의사결정기록에 등재해야 '승인' 상태로 넘어갑니다.</div>";
+    "첫 회의에서 전부 <b>개인 이름</b>으로 바꾸고 42_의사결정기록에 등재해야 '승인' 상태로 넘어갑니다.</div>";
   return h;
+}
+
+/* ── 과제 티켓 — 드래그 정렬 + 토글 ─────── */
+function tkOrder() {
+  var ids = LX.project.rows.map(function (r) { return r.id; });
+  var saved = (WB.order || []).filter(function (i) { return ids.indexOf(i) >= 0; });
+  ids.forEach(function (i) { if (saved.indexOf(i) < 0) saved.push(i); });
+  return saved;
+}
+function tkRender() {
+  var box = el("tkList"); if (!box) return;
+  var P = LX.project, rootName = {};
+  LX.status.gap.roots.forEach(function (r) { rootName[r.key] = r.n; });
+  var byId = {}; P.rows.forEach(function (r) { byId[r.id] = r; });
+  var order = tkOrder();
+
+  var h = order.map(function (id, n) {
+    var a = byId[id]; if (!a) return "";
+    var open = (WB.open || {})[id];
+    /* 핵심 지표 2~3개만 앞면에 */
+    var kpis = [];
+    if (a.opY) kpis.push({ l: "연환산 손익", v: won(a.opY) });
+    if (a.revT) kpis.push({ l: "올해 매출", v: won(a.revT) });
+    kpis.push({ l: "기한", v: a.due });
+    if (kpis.length < 3) kpis.push({ l: "담당", v: a.owner });
+    kpis = kpis.slice(0, 3);
+
+    return '<div class="tk' + (a.top ? " top" : "") + (open ? " open" : "") +
+      '" draggable="true" data-tk="' + esc(id) + '">' +
+      '<div class="tk-head" data-tkt="' + esc(id) + '">' +
+      '<span class="tk-rank">' + (n + 1) + "</span>" +
+      '<span class="tk-grip" title="끌어서 순위 변경">⠿</span>' +
+      '<div class="tk-title"><span class="tk-id">' + esc(id) + "</span>" +
+      "<b>" + esc(a.name) + "</b>" +
+      '<span class="tk-tags"><span class="bg bg-gy">' + esc(a.seg) + "</span>" +
+      '<span class="bg bg-gy">' + esc(a.lever) + "</span>" +
+      '<span class="bg ' + (a.hold ? "bg-wa\">보류" : "bg-bl\">" + esc(a.status)) +
+      '</span></span></div>' +
+      '<div class="tk-kpi">' + kpis.map(function (k) {
+        return "<div><span>" + esc(k.l) + "</span><b>" + esc(k.v) + "</b></div>";
+      }).join("") + "</div>" +
+      '<span class="tk-caret">' + (open ? "▲" : "▼") + "</span></div>" +
+      '<div class="tk-body"' + (open ? "" : " hidden") + '>' +
+      '<dl class="act-g">' +
+      "<dt>원인</dt><dd>" + esc(rootName[a.root] || a.root) + "</dd>" +
+      "<dt>대상 사업</dt><dd>" + esc(a.seg) + "</dd>" +
+      "<dt>담당</dt><dd>" + esc(a.owner) +
+      (/[가-힣]{2,4}$/.test(a.owner) && a.owner.indexOf("·") < 0 ? "" :
+        '<span class="mini">★부서명입니다. 개인 이름으로 바꿔야 \'승인\'으로 넘어갑니다</span>') + "</dd>" +
+      "<dt>기한</dt><dd>" + esc(a.due) + "</dd>" +
+      "<dt>올해 실현 기대 — 매출</dt><dd>" + (a.revT ? "<b>" + won(a.revT) + "</b>" : "—") + "</dd>" +
+      "<dt>연환산 기대효과 — 손익</dt><dd>" + (a.opY ? "<b>" + won(a.opY) + "</b>" : "—") + "</dd>" +
+      "<dt>기대효과 산출 근거</dt><dd>" + lk(a.basis) + "</dd>" +
+      "<dt>실현 측정지표</dt><dd>" + esc(a.metric) + "</dd>" +
+      "</dl></div></div>";
+  }).join("");
+  box.innerHTML = h;
+
+  var st = el("tkState");
+  if (st) st.textContent = (WB.order && WB.order.length)
+    ? "회의에서 조정한 순서가 저장되어 있습니다 (" + order.length + "건)"
+    : "기본 순서 — 원인별 우선순위";
+}
+function tkMove(from, to) {
+  var o = tkOrder();
+  var i = o.indexOf(from), j = o.indexOf(to);
+  if (i < 0 || j < 0 || i === j) return;
+  o.splice(j, 0, o.splice(i, 1)[0]);
+  WB.order = o; wbSave(); tkRender();
 }
 
 function pBoard() {
@@ -1742,7 +1793,7 @@ function pTabs() {
 }
 
 /* ══ 라우터 ════════════════════════════════ */
-var AFTER = { goal: pGoalAfter, biz: pBizAfter, now: pNowAfter, plan: wbRender };
+var AFTER = { goal: pGoalAfter, biz: pBizAfter, now: pNowAfter, plan: wbRender, tasks: tkRender };
 
 function buildNav(cur) {
   var page = PAGES.filter(function (x) { return x.id === cur; })[0] || PAGES[0];
@@ -1820,6 +1871,50 @@ function init() {
     }
   });
   document.addEventListener("keydown", function (e) { if (e.key === "Escape") closeDrill(); });
+
+  /* 과제 티켓 — 토글 + 순서 초기화 */
+  document.addEventListener("click", function (e) {
+    var t = e.target; if (!t || !t.closest) return;
+    if (t.closest("#tkReset")) { WB.order = []; wbSave(); tkRender(); return; }
+    var head = t.closest("[data-tkt]");
+    if (head) {
+      var id = head.dataset.tkt;
+      WB.open = WB.open || {};
+      WB.open[id] = !WB.open[id];
+      wbSave(); tkRender();
+    }
+  });
+
+  /* 과제 티켓 — 끌어서 순위 변경 */
+  var dragId = null;
+  document.addEventListener("dragstart", function (e) {
+    var c = e.target && e.target.closest ? e.target.closest("[data-tk]") : null;
+    if (!c) return;
+    dragId = c.dataset.tk;
+    c.classList.add("dragging");
+    if (e.dataTransfer) { e.dataTransfer.effectAllowed = "move"; try { e.dataTransfer.setData("text/plain", dragId); } catch (x) {} }
+  });
+  document.addEventListener("dragend", function (e) {
+    var c = e.target && e.target.closest ? e.target.closest("[data-tk]") : null;
+    if (c) c.classList.remove("dragging");
+    document.querySelectorAll(".tk.over").forEach(function (n) { n.classList.remove("over"); });
+    dragId = null;
+  });
+  document.addEventListener("dragover", function (e) {
+    var c = e.target && e.target.closest ? e.target.closest("[data-tk]") : null;
+    if (!c || !dragId) return;
+    e.preventDefault();
+    if (e.dataTransfer) e.dataTransfer.dropEffect = "move";
+    document.querySelectorAll(".tk.over").forEach(function (n) { n.classList.remove("over"); });
+    if (c.dataset.tk !== dragId) c.classList.add("over");
+  });
+  document.addEventListener("drop", function (e) {
+    var c = e.target && e.target.closest ? e.target.closest("[data-tk]") : null;
+    if (!c || !dragId) return;
+    e.preventDefault();
+    tkMove(dragId, c.dataset.tk);
+    dragId = null;
+  });
 
   /* 워크벤치 — 드롭다운·입력이 바뀌면 표만 다시 그립니다 */
   document.addEventListener("change", function (e) {
