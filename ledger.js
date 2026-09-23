@@ -417,7 +417,7 @@ var PHASES = [
 var NAVLABEL = {
   goal: "목표와 전략", biz: "사업별 현황", now: "전사 현황", gap: "원인 분해",
   stores: "점포 비교", landing: "착지 전망", plan: "점포 목표 설정", csf: "CSF · KPI",
-  tasks: "전략과제", board: "실행관리", review: "지표리뷰", loop: "루프 규칙",
+  capa: "로스터리 CAPA", tasks: "전략과제", board: "실행관리", review: "지표리뷰", loop: "루프 규칙",
   tree: "지표 체계", bep: "배수 계산 근거", gates: "가맹사업 시작 요건",
   pl: "관리손익이란", shared: "상품·제품 비용분담", trust: "숫자 신뢰도", tabs: "대장 탭 지도"
 };
@@ -439,6 +439,8 @@ var PAGES = [
 
   { ph: 2, id: "plan",   t: "점포별 목표 설정 — 고정비에서 매출목표를 역산한다",
     s: "바꿀 수 없는 고정비를 먼저 놓고, 그 위에서 목표 월매출을 계산합니다. 점포마다 흑자전환 타겟인지 쇼케이스인지를 고르면 판정과 목표가 바뀝니다.", f: pPlan },
+  { ph: 2, id: "capa",   t: "로스터리 생산 CAPA 시뮬레이터 — 가맹이 몇 개 열리면 증설해야 하나",
+    s: "가맹점 하나가 열릴 때마다 로스터리 매출이 월 84만원씩 늘어납니다. 지금 인력으로 어디까지 감당되는지, 언제 증원해야 하는지, 그때 손익이 어떻게 되는지를 미리 계산합니다.", f: pCapa },
   { ph: 2, id: "csf",    t: "세부사업별 CSF와 KPI",
     s: "사업마다 성공의 조건이 다릅니다. CSF는 문장이고 KPI는 그 문장을 재는 숫자입니다.", f: pCsf },
   { ph: 2, id: "tasks",  t: "전략과제",
@@ -615,10 +617,45 @@ function bizSeries(s) {
 function bizOpSeries(s) {
   var tgt = s.plan.map(function (p) { return p * 0.25; });
   var act = s.op.concat([null, null, null, null]);
-  return [
+  var out = [
     { name: "목표 (매출계획 × 25%)", color: "#9CA3AF", data: tgt, dash: true, thin: true },
     { name: "관리 영업손익 실적", color: "#B03A2E", data: act, fill: "rgba(176,58,46,.06)" }
   ];
+  /* 무인직영만 9~12월 예측선 — 기계렌탈료 → 감가상각비 전환 반영 */
+  if (s.key === "unm" && LX.unmFcst) {
+    var f = [null, null, null, null, null, null, null, s.op[7]];
+    LX.unmFcst.op912.forEach(function (v) { f.push(v); });
+    out.push({ name: "예측 — 렌탈료 종료 후 (9~12월)", color: "#1E6B4F", data: f, dash: true });
+  }
+  return out;
+}
+
+/* 로스터리 손익분기 돌파 — 매출 경로 / 고정비 경로 */
+function rstBepBlock() {
+  var R = LX.rstBep;
+  var h = '<h3 style="margin:22px 0 6px;font-size:13.5px;font-weight:800">' + esc(R.t) + "</h3>" +
+    '<p class="sec-d" style="margin-bottom:10px">' + esc(R.d) + "</p>" +
+    '<p class="fx-block">' + esc(R.fx) + "</p>" +
+    '<div class="tw"><table><thead><tr><th>경로</th><th class="num">필요 월매출</th>' +
+    '<th class="num">허용 월 고정비</th><th class="num">매출 변화</th><th class="num">고정비 변화</th>' +
+    "<th>어떻게 하나</th><th>위험</th></tr></thead><tbody>" +
+    R.paths.map(function (p, i) {
+      return "<tr" + (i === 2 ? ' class="tot"' : "") + "><td><b>" + esc(p.n) + "</b></td>" +
+        '<td class="num">' + esc(p.rev) + '</td><td class="num">' + esc(p.fix) + "</td>" +
+        '<td class="num' + (p.dr === "—" ? " muted" : " neg") + '">' + esc(p.dr) + "</td>" +
+        '<td class="num' + (p.df === "—" ? " muted" : " neg") + '">' + esc(p.df) + "</td>" +
+        '<td class="small">' + esc(p.how) + '</td><td class="small muted">' + esc(p.risk) +
+        "</td></tr>";
+    }).join("") + "</tbody></table></div>" +
+    '<h3 style="margin:20px 0 6px;font-size:13.5px;font-weight:800">고정비 831만은 무엇으로 되어 있나</h3>' +
+    tbl(["항목", "월 금액", "고정비 대비", "줄일 수 있나"], R.fixMix) +
+    '<div class="banner b-blue" style="margin:12px 0 0"><b>과제 연결</b>' +
+    "경로 A는 <b>P-002(거래처 확대)</b>와 <b>P-016(정기 공급 계약 전환)</b>, " +
+    "경로 B는 <b>P-010(고정비 구조 조정)</b>입니다. 지금까지 과제가 매출 쪽에 치우쳐 있었는데, " +
+    "권장안인 경로 C는 둘을 동시에 돌려야 하므로 <b>두 과제를 한 묶음으로 승인</b>하는 것이 맞습니다. " +
+    "다만 인력을 줄이면 생산 CAPA도 줄어 매출 상한이 낮아지므로, " +
+    "<b>P-021(CAPA 측정)</b>이 끝나기 전에는 인건비를 건드리지 않는 것이 안전합니다.</div>";
+  return h;
 }
 
 function pBiz() {
@@ -669,6 +706,13 @@ function pBiz() {
           tbl(s.rental.head, s.rental.rows) +
           '<div class="banner b-red" style="margin:12px 0 0">' + esc(s.rental.after) + "</div>"
         : "") +
+      (s.key === "unm" && LX.unmFcst
+        ? '<h3 style="margin:20px 0 6px;font-size:13.5px;font-weight:800">' + esc(LX.unmFcst.t) + "</h3>" +
+          '<p class="sec-d" style="margin-bottom:10px">' + esc(LX.unmFcst.d) + "</p>" +
+          tbl(["항목", "금액", "산출 근거"], LX.unmFcst.rows) +
+          '<div class="banner b-amber" style="margin:12px 0 0">' + esc(LX.unmFcst.caveat) + "</div>"
+        : "") +
+      (s.key === "rst" && LX.rstBep ? rstBepBlock() : "") +
       "</div>" +
       '<div class="dx-kpi">' +
       "<div><span>1~8월 매출</span><b>" + won(sg.rev || 0) + "</b></div>" +
@@ -691,10 +735,10 @@ function pBiz() {
   return h;
 }
 function pBizAfter() {
-  var M = LX.meta.months;
+  var M = LX.meta.months, N = LX.biz.chartNotes || {};
   LX.biz.segs.forEach(function (s) {
-    line("bz_" + s.key, bizSeries(s), M, { h: 230, split: 7 });
-    line("bo_" + s.key, bizOpSeries(s), M, { h: 230, split: 7 });
+    line("bz_" + s.key, bizSeries(s), M, { h: 230, split: 7, notes: N[s.key] });
+    line("bo_" + s.key, bizOpSeries(s), M, { h: 230, split: 7, notes: N[s.key] });
   });
 }
 
@@ -1501,6 +1545,117 @@ function wbRender() {
   eb.innerHTML = e;
 }
 
+/* ══ 로스터리 CAPA 시뮬레이터 ═══════════════ */
+function pCapa() {
+  var C = LX.capa, b = C.base;
+  var h = '<div class="banner b-amber"><b>이 화면의 전제가 아직 측정되지 않았습니다</b>' +
+    esc(C.caveat) + "</div>";
+
+  h += '<div class="card"><h2>계산에 쓰는 값</h2>' +
+    '<p class="sec-d">' + esc(C.d) + "</p>" +
+    tbl(["항목", "값", "출처 · 비고"], C.src) + "</div>";
+
+  h += '<div class="card"><h2>시뮬레이션</h2>' +
+    '<div class="wb-ctl">' +
+    '<div class="wb-f"><label for="cpCapa">현재 인력의 월 최대 생산 매출 (원)</label>' +
+    '<input id="cpCapa" type="number" step="1000000" min="0"></div>' +
+    '<div class="wb-f"><label for="cpStore">가맹점 1곳당 월 원두 매출 (원)</label>' +
+    '<input id="cpStore" type="number" step="10000" min="0"></div>' +
+    '<div class="wb-f"><label for="cpLab">증원 1명당 월 인건비 (원)</label>' +
+    '<input id="cpLab" type="number" step="100000" min="0"></div>' +
+    '<div class="wb-f"><label for="cpAdd">증원 1명당 추가 CAPA (원)</label>' +
+    '<input id="cpAdd" type="number" step="1000000" min="0"></div>' +
+    '<p class="wb-hint">빨간 글씨의 <b>현재 인력의 월 최대 생산 매출</b>이 이 시뮬레이터의 핵심 입력값입니다. ' +
+    "지금은 가정값이므로, 실제 측정(P-021)이 끝나면 이 칸을 먼저 바꾸십시오.</p></div>" +
+    '<div id="cpOut"></div></div>';
+
+  h += '<div class="card"><h2>이 화면이 답하는 질문</h2><ol style="line-height:2">' +
+    "<li><b>지금 인력으로 가맹점 몇 개까지 감당되나</b> — CAPA를 넘기 직전의 가맹점 수입니다. 그 수를 넘겨 계약하면 공급 지연이 곧 가맹점 클레임이 됩니다.</li>" +
+    "<li><b>로스터리가 흑자로 돌아서는 가맹점 수는 몇 개인가</b> — 가맹이 로스터리 적자의 해법이 되는 시점입니다.</li>" +
+    "<li><b>증원하면 손익이 어떻게 되나</b> — 인건비가 늘면 손익분기가 다시 올라갑니다. 증원 직후 한동안 적자가 되는 구간이 있는지를 봅니다.</li>" +
+    "<li><b>고정비를 줄여도 되나</b> — CAPA 여유가 크면 인력을 줄여도 매출 상한에 여유가 있다는 뜻이므로, 그때는 P-010(고정비 절감)이 안전합니다. 여유가 없으면 인건비를 건드리면 안 됩니다.</li>" +
+    "</ol></div>";
+  return h;
+}
+
+function cpRender() {
+  var box = el("cpOut"); if (!box || !LX.capa) return;
+  var b = LX.capa.base;
+  var gc = el("cpCapa"), gs = el("cpStore"), gl = el("cpLab"), ga = el("cpAdd");
+  if (gc && gc.value === "") gc.value = (WB.capa || b.capa0);
+  if (gs && gs.value === "") gs.value = (WB.perStore || b.perStore);
+  if (gl && gl.value === "") gl.value = (WB.addLabor || b.addLabor);
+  if (ga && ga.value === "") ga.value = (WB.addCapa || b.addCapa);
+
+  var capa0 = WB.capa || b.capa0, per = WB.perStore || b.perStore;
+  var aLab = WB.addLabor || b.addLabor, aCap = WB.addCapa || b.addCapa;
+
+  var calc = function (n) {
+    var rev = b.rev0 + per * n;
+    var add = 0;
+    while (rev > capa0 + aCap * add) { add++; if (add > 50) break; }
+    var fix = b.fix0 + aLab * add;
+    var cmAmt = rev * b.cm;
+    return { n: n, rev: rev, add: add, fix: fix, cm: cmAmt, op: cmAmt - fix,
+      use: capa0 + aCap * add ? rev / (capa0 + aCap * add) : 0 };
+  };
+
+  /* 주요 분기점 */
+  var lastFree = 0, bepN = null, firstAdd = null;
+  for (var i = 0; i <= 120; i++) {
+    var r = calc(i);
+    if (r.add === 0) lastFree = i;
+    if (firstAdd === null && r.add > 0) firstAdd = i;
+    if (bepN === null && r.op >= 0) bepN = i;
+  }
+
+  var h = '<div class="kpis" style="margin-bottom:16px">' +
+    '<div class="kpi"><div class="k-l">증원 없이 감당 가능</div><div class="k-v">' + lastFree +
+    '개점</div><div class="k-s">가맹점 ' + (firstAdd === null ? "—" : firstAdd) + "개째부터 증원 필요</div></div>" +
+    '<div class="kpi ' + (bepN === null ? "neg" : "pos") + '"><div class="k-l">로스터리 흑자 전환</div><div class="k-v">' +
+    (bepN === null ? "도달 불가" : bepN + "개점") + '</div><div class="k-s">' +
+    (bepN === null ? "현재 조건으로는 가맹만으로 흑자 불가" : "가맹점 " + bepN + "개가 열리면 흑자") + "</div></div>" +
+    '<div class="kpi"><div class="k-l">현재 가동률</div><div class="k-v">' +
+    pct(b.rev0 / capa0, 0) + '</div><div class="k-s">월매출 ' + won(b.rev0) + " ÷ CAPA " + won(capa0) + "</div></div>" +
+    '<div class="kpi"><div class="k-l">CAPA 여유</div><div class="k-v">' +
+    won(capa0 - b.rev0) + '</div><div class="k-s">가맹점 ' + Math.floor((capa0 - b.rev0) / per) + "개분</div></div></div>";
+
+  var pts = [0, 5, 10, bepN, 15, lastFree, firstAdd, 25, 30, 40];
+  pts = pts.filter(function (v, i2, a) { return v !== null && v !== undefined && a.indexOf(v) === i2; })
+    .sort(function (x, y) { return x - y; });
+
+  h += '<div class="tw"><table><thead><tr><th class="num">가맹점 수</th>' +
+    '<th class="num">로스터리 월매출</th><th class="num">CAPA 대비</th><th class="num">증원</th>' +
+    '<th class="num">월 고정비</th><th class="num">월 공헌이익</th><th class="num">월 영업손익</th>' +
+    "<th>상태</th></tr></thead><tbody>" +
+    pts.map(function (n) {
+      var r = calc(n);
+      var tag = n === bepN ? '<span class="bg bg-ok">흑자 전환</span>'
+        : n === firstAdd ? '<span class="bg bg-wa">증원 필요</span>'
+        : n === 0 ? '<span class="bg bg-gy">현재</span>'
+        : r.op >= 0 ? '<span class="bg bg-ok">흑자</span>' : '<span class="bg bg-no">적자</span>';
+      return "<tr" + (n === bepN || n === firstAdd ? ' class="tot"' : "") +
+        '><td class="num"><b>' + n + '</b></td><td class="num">' + won(r.rev) + "</td>" +
+        '<td class="num' + (r.use > 0.95 ? " neg" : "") + '">' + pct(r.use, 0) + "</td>" +
+        '<td class="num">' + (r.add ? "+" + r.add + "명" : "—") + "</td>" +
+        '<td class="num">' + won(r.fix) + '</td><td class="num">' + won(r.cm) + "</td>" +
+        '<td class="num ' + sgn(r.op) + '"><b>' + won(r.op) + "</b></td><td>" + tag + "</td></tr>";
+    }).join("") + "</tbody></table></div>";
+
+  h += '<div class="banner b-blue" style="margin:16px 0 0"><b>지금 값으로 읽으면</b>' +
+    "기존채널 월 " + won(b.rev0) + "에 가맹점이 하나 열릴 때마다 " + won(per) + "씩 더해집니다. " +
+    "증원 없이 <b>" + lastFree + "개점</b>까지 감당되고, " +
+    (bepN === null ? "현재 조건으로는 가맹만으로 흑자에 도달하지 못합니다. 고정비를 함께 줄여야 합니다(P-010)."
+      : "<b>" + bepN + "개점</b>에서 흑자로 돌아섭니다.") +
+    (bepN !== null && firstAdd !== null && bepN < firstAdd
+      ? " 흑자 전환이 증원 시점보다 <b>앞에</b> 오므로, 증원 부담 없이 흑자 구간을 먼저 지납니다."
+      : bepN !== null && firstAdd !== null
+        ? " 흑자 전환보다 증원이 <b>먼저</b> 필요하므로, 증원 직후 손익이 다시 내려가는 구간을 감안해야 합니다." : "") +
+    " 44_프로젝션엔진의 가맹 계획은 연간 가맹 점포·월 101.5(≒ 연말 기준 25개 내외)를 전제하므로, " +
+    "그 계획대로라면 이 표의 오른쪽 구간까지 가게 됩니다.</div>";
+  box.innerHTML = h;
+}
+
 /* ══ ④ 전략과제 ════════════════════════════ */
 function pTasks() {
   var P = LX.project;
@@ -1793,7 +1948,7 @@ function pTabs() {
 }
 
 /* ══ 라우터 ════════════════════════════════ */
-var AFTER = { goal: pGoalAfter, biz: pBizAfter, now: pNowAfter, plan: wbRender, tasks: tkRender };
+var AFTER = { goal: pGoalAfter, biz: pBizAfter, now: pNowAfter, plan: wbRender, tasks: tkRender, capa: cpRender };
 
 function buildNav(cur) {
   var page = PAGES.filter(function (x) { return x.id === cur; })[0] || PAGES[0];
@@ -1927,7 +2082,13 @@ function init() {
     else if (t.id === "wbRoy") { WB.roy = Math.max(0, (+t.value || 0) / 100); hit = true; }
     else if (t.id === "wbCut") { WB.cut = Math.max(1, +t.value || 2); hit = true; }
     else if (t.id === "wbAdv") { WB.adv = Math.max(1, +t.value || 1000); hit = true; }
-    if (hit) { wbSave(); wbRender(); }
+    if (hit) { wbSave(); wbRender(); return; }
+    var cp = false;
+    if (t.id === "cpCapa") { WB.capa = Math.max(1, +t.value || 1); cp = true; }
+    else if (t.id === "cpStore") { WB.perStore = Math.max(1, +t.value || 1); cp = true; }
+    else if (t.id === "cpLab") { WB.addLabor = Math.max(0, +t.value || 0); cp = true; }
+    else if (t.id === "cpAdd") { WB.addCapa = Math.max(1, +t.value || 1); cp = true; }
+    if (cp) { wbSave(); cpRender(); }
   });
   window.addEventListener("hashchange", route);
   window.addEventListener("resize", function () {
@@ -1941,6 +2102,7 @@ if (document.readyState === "loading") document.addEventListener("DOMContentLoad
 else init();
 
 })();
+
 
 
 
