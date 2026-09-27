@@ -459,8 +459,8 @@ var PAGES = [
     s: "③의 목표 월매출이 어떻게 나왔는지, 로봇비용 배수와 로스터리 적용까지.", f: pBep },
   { ph: 4, id: "gates",  t: "가맹사업 시작 요건 9가지",
     s: "무인직영 CSF의 측정 도구이자 가맹 개시의 선행조건입니다.", f: pGates },
-  { ph: 4, id: "roast",  t: "로스터리 관리회계 — 사내대체가격 설계",
-    s: "생산량의 69%가 LX 매장으로 가는데 내부거래라 매출로 잡히지 않습니다. 고정비는 전량을 만드는 데 들어가는데 매출은 31%분만 인식됩니다. 그 왜곡을 가상 숫자 없이 바로잡는 기준입니다.", f: pRoast },
+  { ph: 4, id: "roast",  t: "로스터리 관리회계 — 이전가격 설계",
+    s: "생산량 1,600kg 중 1,100kg이 LX 매장으로 가는데 내부거래라 매출로 잡히지 않습니다. 고정비는 전량을 만드는 데 들어가는데 매출은 31%분만 인식됩니다. LX 납품분에 이전가격을 매겨 그 왜곡을 바로잡는 기준입니다.", f: pRoast },
   { ph: 4, id: "pl",     t: "관리손익이란",
     s: "왜 원본 영업손익을 그대로 쓰지 않는가.", f: pPL },
   { ph: 4, id: "shared", t: "상품과 제품의 비용 분담",
@@ -632,6 +632,95 @@ function bizOpSeries(s) {
   return out;
 }
 
+/* ── 제품(로스터리) 심층 패널 ─────────────── */
+function rstPanelBlock() {
+  var P = LX.rstPanel; if (!P) return "";
+  var T = function (head, rows, opt) {
+    opt = opt || {};
+    return '<div class="tw"><table><thead><tr>' +
+      head.map(function (x, i) {
+        return "<th" + (opt.num && opt.num.indexOf(i) >= 0 ? ' class="num"' : "") + ">" + esc(x) + "</th>";
+      }).join("") + "</tr></thead><tbody>" +
+      rows.map(function (r) {
+        var tot = String(r[0]).indexOf("▸▸") === 0 || String(r[0]).indexOf("★") === 0;
+        return "<tr" + (tot ? ' class="tot"' : "") + ">" +
+          r.map(function (v, i) {
+            var s = String(v);
+            var neg = s.indexOf("−") === 0 && /\d/.test(s);
+            var pos = s.indexOf("+") === 0 && /\d/.test(s);
+            var isNum = opt.num && opt.num.indexOf(i) >= 0;
+            return "<td" + (isNum ? ' class="num' + (neg ? " neg" : pos ? " pos" : "") + '"'
+              : i >= (opt.smallFrom === undefined ? 99 : opt.smallFrom) ? ' class="small muted"' : "") + ">" +
+              (i === 0 ? "<b>" + esc(s) + "</b>" : esc(s)) + "</td>";
+          }).join("") + "</tr>";
+      }).join("") + "</tbody></table></div>";
+  };
+
+  var h = '<div class="rp">';
+
+  /* ① 재무회계 */
+  h += '<h3 class="rp-h">' + esc(P.finT) + "</h3>" +
+    '<p class="sec-d">' + esc(P.finD) + "</p>" +
+    T(P.finHead, P.fin, { num: [1, 2] }) +
+    '<p class="small muted" style="margin:10px 0 0">' + esc(P.finNote) + "</p>";
+
+  /* ② 착시 */
+  h += '<h3 class="rp-h">' + esc(P.illT) + "</h3>" +
+    T(["항목", "값", "설명"], P.ill, { num: [1], smallFrom: 2 }) +
+    '<div class="banner b-green" style="margin:14px 0 0"><b>적자의 정체</b>' + P.illAfter + "</div>";
+
+  /* 용어 정의 */
+  if (P.defs) {
+    h += '<h3 class="rp-h">' + esc(P.defsT) + "</h3>" +
+      '<p class="sec-d">' + esc(P.defsD) + "</p>" + defBox(P.defs);
+  }
+
+  /* ③ 이전가격 */
+  h += '<h3 class="rp-h">' + esc(P.maT) + "</h3>" +
+    '<p class="sec-d">' + esc(P.maD) + "</p>" +
+    '<p class="fx-block">' + esc(P.maFx) + "</p>" +
+    T(["단계", "값", "산출"], P.maSteps, { smallFrom: 2 }) +
+    (P.maTwo ? '<div class="banner b-amber" style="margin:14px 0 0"><b>두 버전을 함께 씁니다</b>' + P.maTwo + "</div>" : "");
+
+  /* ④ 기준1 */
+  h += '<h3 class="rp-h">' + esc(P.m1T) + "</h3>" +
+    '<p class="sec-d">' + P.m1D + "</p>" +
+    T(P.m1Head, P.m1, { num: [1, 2, 3] }) +
+    '<h4 class="rp-h4">' + esc(P.m1Item.t) + "</h4>" +
+    T(P.m1Item.head, P.m1Item.rows, { num: [1, 2, 3, 4] }) +
+    (P.m0Item ? '<h4 class="rp-h4">' + esc(P.m0Item.t) + "</h4>" +
+      T(P.m0Item.head, P.m0Item.rows, { num: [1, 2, 3, 4] }) : "") +
+    (P.m0Note ? '<p class="small muted" style="margin:10px 0 0">' + P.m0Note + "</p>" : "") +
+    '<div class="banner b-green" style="margin:14px 0 0"><b>건강한 사업입니다</b>' + P.m1After + "</div>" +
+    (P.m1Scope ? '<div class="banner b-amber" style="margin:12px 0 0"><b>이 장표의 적용 범위</b>' + P.m1Scope + "</div>" : "");
+
+  /* ⑤ B2B */
+  h += '<h3 class="rp-h">' + esc(P.b2bT) + "</h3>" +
+    '<p class="sec-d">' + P.b2bD + "</p>" +
+    T(P.b2bHead, P.b2b, { num: [1, 2, 3, 4, 5] }) +
+    '<div class="banner b-blue" style="margin:14px 0 0">' + P.b2bAfter + "</div>";
+
+  /* ⑥ 레버 */
+  h += '<h3 class="rp-h">' + esc(P.levT) + "</h3>" +
+    '<p class="sec-d">' + esc(P.levD) + "</p>" +
+    T(P.levHead, P.lev, { num: [2, 3], smallFrom: 4 }) +
+    '<div class="banner b-amber" style="margin:14px 0 0"><b>순서가 분명합니다</b>' + P.levAfter + "</div>";
+
+  /* ⑦ 확장 */
+  h += '<h3 class="rp-h">' + esc(P.expT) + "</h3>" +
+    '<p class="sec-d">' + P.expD + "</p>" +
+    '<p class="fx-block">' + esc(P.expFx) + "</p>" +
+    T(P.expHead, P.exp, { num: [1, 2, 3], smallFrom: 4 }) +
+    '<div class="banner b-blue" style="margin:14px 0 0"><b>거꾸로 읽습니다</b>' + P.expAfter + "</div>";
+
+  /* ⑧ 점검 */
+  h += '<h3 class="rp-h">' + esc(P.chkT) + "</h3>" +
+    T(P.chkHead, P.chk, { num: [0], smallFrom: 2 }) +
+    '<div class="banner b-red" style="margin:14px 0 0"><b>1번이 먼저입니다</b>' + P.chkAfter + "</div>";
+
+  return h + "</div>";
+}
+
 /* 로스터리 손익분기 돌파 — 매출 경로 / 고정비 경로 */
 function rstBepBlock() {
   var R = LX.rstBep;
@@ -733,13 +822,16 @@ function pBiz() {
         ? '<div class="banner b-blue" style="margin:20px 0 0"><b>★이 −2,458만은 로스터리 사업의 실상이 아닙니다</b>' +
           "로스터리는 월 1,600kg을 볶는데 그중 <b>1,100kg(68.75%)이 LX 매장으로</b> 갑니다. " +
           "마진을 붙이지 않고 내부거래라 매출로 잡지 않으므로, 고정비 전액을 B2B 500kg분 매출로만 덮게 됩니다.<br><br>" +
-          '<span class="ma-cmp"><span><em>① 재무회계 (외부 보고)</em><b class="neg">연 −3,686만</b></span>' +
-          '<span><em>② 관리회계 (사내대체 반영)</em><b class="pos">연 +3,166만</b></span>' +
-          '<span><em>③ 내재화 이익 (직접 볶는 가치)</em><b class="pos">연 +8,172만</b></span></span>' +
-          "사내대체가격은 kg당 <b>21,809원</b>(제조변동비 16,618 + 고정비 5,191)이고 마진 0입니다. " +
-          "다만 이렇게 바꾸면 <b>매장이 월 571만을 더 지게 됩니다</b>(전사 합계는 불변). " +
-          '설계 전문은 <a href="#/roast">부록 · 로스터리 관리회계</a>에 있습니다.</div>'
+          '<span class="ma-cmp"><span><em>재무회계 (현행 장부)</em><b class="neg">월 −307만</b></span>' +
+          '<span><em>★기준1 — 가상매출 인식</em><b class="pos">월 +1,078만</b></span>' +
+          '<span><em>기준2 — B2B 부문 (보조)</em><b class="pos">월 +537만</b></span></span>' +
+          "<b>이전가격</b>(같은 회사 안에서 한 사업이 다른 사업에 넘길 때 매기는 내부 가격)은 " +
+          "원가가산법으로 산출해 24H <b>kg당 28,173원</b>, 에티오피아 33,545원입니다. " +
+          "완전원가 22,800원에 B2B 마진의 절반(23.56%)을 얹되 외부 판매가를 넘지 않게 제약한 값입니다. " +
+          "다만 이전가격을 적용하면 <b>매장이 지는 원두원가가 월 1,728만 → 2,260만으로 오릅니다</b>(전사 합계는 불변). " +
+          '설계 전문은 <a href="#/roast">부록 · 로스터리 관리회계</a>에 있습니다. (로스터리_관리회계_최종본.xlsx 2026-09-27 기준)</div>'
         : "") +
+      (s.key === "rst" && LX.rstPanel ? rstPanelBlock() : "") +
       (s.key === "rst" && LX.rstBep ? rstBepBlock() : "") +
       "</div>" +
       '<div class="dx-kpi">' +
@@ -755,7 +847,10 @@ function pBiz() {
     var P = LX.perStore;
     h += '<div class="card"><h2>' + esc(P.t) + "</h2>" +
       '<p class="sec-d">' + esc(P.d) + "</p>" +
-      '<div class="grid2">' +
+      defBox([{ n: "점포·월 (store-month)",
+        f: "점포당 월평균 매출 = 기간 매출 ÷ 점포·월　·　점포·월 = Σ(각 점포가 실제로 영업한 개월 수)",
+        e: "점포 수가 기간 중에 변하면 \u0027점포 수 × 개월 수\u0027로 나눌 수 없습니다. 투자모델은 6개점이지만 용산만 1월부터였고 을지·가락·상암은 4월, 강남은 5월, 마포프론트원은 7월에 열렸습니다. 그래서 실제 운영된 점포·월은 6×8=48이 아니라 <b>29</b>입니다. 48로 나누면 열지도 않은 달까지 분모에 넣는 셈이라 점포당 매출이 40% 과소 표시됩니다." }]) +
+      '<div class="grid2" style="margin-top:16px">' +
       "<div>" + lineBox("psA", psSeries(), "실선 = 공시 기준 · 회색 점선 = 목표(44 §E) · 초록 점선 = 유인직영 마포 분할 보정") + "</div>" +
       '<div><div class="tw"><table><thead><tr><th>모델</th><th class="num">1~8월 매출</th>' +
       '<th class="num">점포·월</th><th class="num">점포당 월평균</th><th class="num">목표</th>' +
@@ -1946,59 +2041,103 @@ function pRoast() {
   var R = LX.roastMA; if (!R) return "<p>데이터 없음</p>";
 
   var h = '<div class="kpis">' +
-    '<div class="kpi neg"><div class="k-l">① 재무회계 — 연환산</div><div class="k-v">−3,686만</div>' +
-    '<div class="k-s">매출의 69%가 장부에 안 보이는 상태</div></div>' +
-    '<div class="kpi pos"><div class="k-l">② 관리회계 — 연환산</div><div class="k-v">+3,166만</div>' +
-    '<div class="k-s">사내대체 반영 · 사업 건전성 판단용</div></div>' +
-    '<div class="kpi pos"><div class="k-l">③ 내재화 이익 — 연환산</div><div class="k-v">+8,172만</div>' +
-    '<div class="k-s">직접 볶아서 아끼는 금액(시장가 28,000원 가정)</div></div>' +
-    '<div class="kpi neg"><div class="k-l">매장이 지게 될 원가</div><div class="k-v">월 571만</div>' +
-    '<div class="k-s">점포당 월 44만 · 전사 손익은 불변</div></div></div>';
+    '<div class="kpi neg"><div class="k-l">재무회계 (대장 실적)</div><div class="k-v">월 −307만</div>' +
+    '<div class="k-s">LX 납품분이 매출로 안 잡힙니다</div></div>' +
+    '<div class="kpi pos"><div class="k-l">★기준1 [A] — markup 23.56%</div><div class="k-v">월 +1,078만</div>' +
+    '<div class="k-s">이익률 21.8% · 외부 거래에 준한 정상가격</div></div>' +
+    '<div class="kpi pos"><div class="k-l">★기준1 [B] — 마진 0</div><div class="k-v">월 +537만</div>' +
+    '<div class="k-s">이익률 12.2% · 보수적 하한. 어느 쪽이든 흑자입니다</div></div>' +
+    '<div class="kpi"><div class="k-l">LX 이전가격 (24H 기준)</div><div class="k-v">28,173 / 22,800원</div>' +
+    '<div class="k-s">[A] / [B] · 에티는 33,545 / 29,863원</div></div></div>';
+
+  h += '<div class="banner b-blue"><b>출처</b>' + esc(R.src) + "</div>";
+
+  h += '<div class="card"><h2>이 페이지에서 처음 나오는 용어</h2>' +
+    '<p class="sec-d">새로 쓰는 말입니다. 정의와 계산식을 먼저 맞춰 두어야 회의에서 다른 뜻으로 쓰이지 않습니다.</p>' +
+    defBox([
+      { n: "이전가격 (Transfer Price)", f: "가상매출 = 사내 납품량 × 이전가격",
+        e: "같은 회사 안에서 한 사업이 다른 사업에 물건을 넘길 때 매기는 내부 가격입니다. 외부 거래가 아니라 재무회계 매출이 되지 않지만, 각 사업의 성과를 따로 보려면 값을 매겨야 합니다. ★값을 어떻게 정하느냐에 따라 두 사업의 손익이 반대로 움직이고 <b>전사 합계는 항상 같습니다.</b> 이 가격은 '얼마를 벌었나'가 아니라 '비용이 어느 사업에 붙어야 하나'를 정하는 장치입니다." },
+      { n: "완전원가 (Full Cost)", f: "완전원가 = 로스반영 생두원가 + 포장·물류/kg + 고정판관비/kg",
+        e: "물건 하나를 만드는 데 실제로 들어간 돈 전부입니다. 만들수록 늘어나는 돈(생두·봉투·택배)에, 만들든 안 만들든 나가는 돈(인건비·월세·관리비)을 생산량으로 나눠 얹은 값입니다. 24H·B2B는 kg당 22,800원, 에티오피아는 29,863원입니다." },
+      { n: "원가가산법 (Cost-plus)", f: "이전가격 = MAX( MIN(완전원가 × (1+적용 markup), 외부 판매가), 완전원가 )",
+        e: "완전원가에 일정 마진을 얹어 이전가격을 정하는 방식입니다. ★<b>상한과 하한이 걸려 있는 것이 핵심</b>입니다 — 내부 공급가가 외부 판매가보다 비쌀 수 없고(상한), 원가보다 쌀 수도 없습니다(하한). 임의로 정한 숫자가 아니라 관리회계 표준입니다." },
+      { n: "적용 markup", f: "적용 markup = B2B markup × 50% = 47.13% × 50% = 23.56%",
+        e: "외부 B2B 거래에서 실제로 붙는 마진율의 절반만 내부거래에 인정합니다. 내부거래에는 <b>판촉비·대손위험·수금비용</b>이 들지 않기 때문입니다. 절반이라는 비율은 조정 가능한 입력값이며, 모델 시트2에서 바꾸면 전체가 재계산됩니다." },
+      { n: "로스율 (Roasting Loss)", f: "로스반영 생두원가 = 구매가 ÷ (1 − 로스율) = 구매가 ÷ 80%",
+        e: "생두를 볶으면 수분이 날아가 무게가 줄어듭니다. 로스율 20%면 완제품 1kg을 만드는 데 생두 1.25kg이 듭니다. 그래서 생두 구매가 13,100원이 완제품 기준으로는 16,375원이 됩니다. 이걸 빼먹으면 원가가 20% 과소 계상됩니다." },
+      { n: "고정비 배부", f: "kg당 고정비 = 월 고정판관비 ÷ 월 생산량 전체",
+        e: "고정비를 생산물 하나하나에 나눠 붙이는 것입니다. ★핵심은 <b>분모를 생산량 전체(1,600kg)로 쓴다</b>는 점입니다. B2B 판매량(500kg)으로 나누면 kg당 고정비가 세 배가 되고, LX 매장에 나간 1,100kg이 부담해야 할 고정비가 장부에서 사라집니다." }
+    ]) + "</div>";
 
   h += '<div class="card"><h2>왜 별도 기준이 필요한가</h2>' +
     "<p>" + esc(R.lead) + "</p>" +
-    '<div class="banner b-amber" style="margin:14px 0 0">' + esc(R.point) + "</div></div>";
+    '<div class="banner b-green" style="margin:14px 0 0">' + esc(R.point) + "</div></div>";
 
-  h += '<div class="card"><h2>' + esc(R.unitT) + "</h2>" +
-    tbl(["항목", "값", "산출 · 비고"], R.unit) +
-    '<div class="banner b-blue" style="margin:14px 0 0"><b>고정비를 1,600kg 전체로 나눕니다</b>' +
-    esc(R.unitNote) + "</div></div>";
-
-  h += '<div class="card"><h2>' + esc(R.plT) + "</h2>" +
-    '<p class="sec-d">' + esc(R.plD) + "</p>" +
-    '<div class="tw"><table><thead><tr>' +
-    R.plHead.map(function (x, i) { return "<th" + (i >= 1 && i <= 3 ? ' class="num"' : "") + ">" + esc(x) + "</th>"; }).join("") +
-    "</tr></thead><tbody>" +
-    R.pl.map(function (r) {
-      var tot = r[0].indexOf("▸▸") === 0;
-      return "<tr" + (tot ? ' class="tot"' : "") + "><td><b>" + esc(r[0]) + "</b></td>" +
-        '<td class="num' + (r[1].indexOf("−") === 0 ? " neg" : "") + '">' + esc(r[1]) + "</td>" +
-        '<td class="num' + (r[2].indexOf("+") === 0 ? " pos" : "") + '">' + esc(r[2]) + "</td>" +
-        '<td class="num' + (r[3].indexOf("+") === 0 ? " pos" : " muted") + '">' + esc(r[3]) + "</td>" +
-        '<td class="small muted">' + esc(r[4]) + "</td></tr>";
-    }).join("") + "</tbody></table></div>" +
-    '<div class="banner b-green" style="margin:14px 0 0"><b>②의 흑자는 어디서 오나</b>' + R.plAfter + "</div></div>";
-
-  h += '<div class="card"><h2>' + esc(R.makeT) + "</h2>" +
-    '<p class="sec-d">' + esc(R.makeD) + "</p>" + tbl(R.makeHead, R.make) +
-    '<div class="banner b-amber" style="margin:14px 0 0">' + esc(R.makeNote) + "</div></div>";
+  h += '<div class="card"><h2>' + esc(R.inT) + "</h2>" +
+    '<p class="sec-d">' + esc(R.inD) + "</p>" +
+    '<h3 style="margin-top:0">월 생산량</h3>' +
+    tbl(["품목", "월 생산 kg", "납품처", "성격"], R.inQty) +
+    "<h3>원가 · 단가</h3>" +
+    tbl(["항목", "값", "비고"], R.inCost) + "</div>";
 
   h += '<div class="card"><h2>' + esc(R.tpT) + "</h2>" +
-    '<div class="tw"><table><thead><tr>' +
-    R.tpHead.map(function (x) { return "<th>" + esc(x) + "</th>"; }).join("") +
-    "</tr></thead><tbody>" +
-    R.tp.map(function (r, i) {
-      return "<tr" + (i === 1 ? ' class="tot"' : "") + "><td><b>" + esc(r[0]) + "</b></td>" +
-        '<td class="nowrap">' + esc(r[1]) + '</td><td class="small">' + esc(r[2]) +
-        '</td><td class="small">' + esc(r[3]) + '</td><td class="small muted">' + esc(r[4]) + "</td></tr>";
-    }).join("") + "</tbody></table></div>" +
-    '<div class="banner b-green" style="margin:16px 0 0"><b>결론</b>' + R.verdict1 + "</div>" +
-    '<div class="banner b-red"><b>두 번째 방안을 권하지 않는 이유</b>' + R.verdict2 + "</div></div>";
+    '<p class="sec-d">' + esc(R.tpD) + "</p>" +
+    "<h3>완전원가 (하한)</h3>" +
+    tbl(["구성", "24H", "에티오피아", "B2B"], R.tpFull) +
+    "<h3>markup 산정</h3>" +
+    tbl(["항목", "값"], R.tpMark) +
+    "<h3>이전가격 결정</h3>" +
+    tbl(["단계", "24H", "에티오피아"], R.tpCalc) +
+    '<div class="banner b-amber" style="margin:14px 0 0"><b>상한이 실제로 작동한 사례</b>' +
+    esc(R.tpNote) + "</div></div>";
 
-  h += '<div class="card"><h2>' + esc(R.storeT) + "</h2>" +
-    '<p class="sec-d">' + esc(R.storeD) + "</p>" +
-    tbl(["항목", "금액", "설명"], R.store) +
-    '<div class="banner b-red" style="margin:14px 0 0">' + R.storeWarn + "</div></div>";
+  h += '<div class="card"><h2>' + esc(R.m1T) + "</h2>" +
+    '<p class="sec-d">' + esc(R.m1D) + "</p>" +
+    '<div class="tw"><table><thead><tr>' +
+    R.m1Head.map(function (x, i) { return "<th" + (i ? ' class="num"' : "") + ">" + esc(x) + "</th>"; }).join("") +
+    "</tr></thead><tbody>" +
+    R.m1.map(function (r) {
+      var tot = r[0].indexOf("▸▸") === 0;
+      return "<tr" + (tot ? ' class="tot"' : "") + "><td><b>" + esc(r[0]) + "</b></td>" +
+        r.slice(1).map(function (v) {
+          return '<td class="num' + (v.indexOf("−") === 0 ? " neg" : tot ? " pos" : "") + '">' + esc(v) + "</td>";
+        }).join("") + "</tr>";
+    }).join("") + "</tbody></table></div>" +
+    '<div class="banner b-green" style="margin:14px 0 0"><b>읽는 법</b>' +
+    "고정비를 쪼개지 않고 사업 전체가 통으로 부담하므로 왜곡이 없습니다. " +
+    "B2B가 이익률 32.0%로 가장 높고, 에티오피아는 생두원가가 비싸 11.0%에 그칩니다. " +
+    "전체 21.8%가 <b>로스터리를 독립 사업으로 볼 때의 수익성</b>입니다.</div></div>";
+
+  h += '<div class="card"><h2>' + esc(R.m2T) + "</h2>" +
+    '<p class="sec-d">' + esc(R.m2D) + "</p>" +
+    tbl(["항목", "금액", "비고"], R.m2) +
+    '<div class="banner b-red" style="margin:14px 0 0"><b>왜 보조인가 — 고정비 배부의 왜곡</b>' +
+    R.m2Warn + "</div></div>";
+
+  h += '<div class="card"><h2>' + esc(R.cmpT) + "</h2>" +
+    '<div class="tw"><table><thead><tr><th>관점</th><th class="num">영업손익 (월)</th>' +
+    "<th>성격</th></tr></thead><tbody>" +
+    R.cmp.map(function (r) {
+      var star = r[0].indexOf("★") === 0;
+      return "<tr" + (star ? ' class="tot"' : "") + "><td><b>" + esc(r[0]) + "</b></td>" +
+        '<td class="num ' + (r[1].indexOf("−") === 0 ? "neg" : "pos") + '"><b>' + esc(r[1]) +
+        '</b></td><td class="small muted">' + esc(r[2]) + "</td></tr>";
+    }).join("") + "</tbody></table></div>" +
+    (R.cmpNote ? '<div class="banner b-amber" style="margin:14px 0 0"><b>두 버전을 함께 씁니다</b>' + R.cmpNote + "</div>" : "") +
+    (R.scope ? '<div class="banner b-amber" style="margin:12px 0 0"><b>이 장표의 적용 범위</b>' + R.scope + "</div>" : "") +
+    "</div>";
+
+  h += '<div class="card"><h2>' + esc(R.recT) + "</h2>" +
+    '<p class="sec-d">' + esc(R.recD) + "</p>" +
+    '<div class="tw"><table><thead><tr><th>항목</th><th class="num">월 금액</th>' +
+    "<th>설명</th></tr></thead><tbody>" +
+    R.rec.map(function (r) {
+      var tot = r[0].indexOf("▸▸") === 0;
+      return "<tr" + (tot ? ' class="tot"' : "") + "><td><b>" + esc(r[0]) + "</b></td>" +
+        '<td class="num ' + (r[1].indexOf("−") === 0 ? "neg" : "pos") + '">' + esc(r[1]) +
+        '</td><td class="small muted">' + esc(r[2]) + "</td></tr>";
+    }).join("") + "</tbody></table></div>" +
+    '<div class="banner b-red" style="margin:14px 0 0"><b>결론</b>' + R.recAfter + "</div></div>";
 
   h += '<div class="card"><h2>이 기준을 쓰기 전에 확인해야 하는 것</h2>' +
     '<div class="tw"><table><thead><tr>' +
@@ -2239,6 +2378,9 @@ if (document.readyState === "loading") document.addEventListener("DOMContentLoad
 else init();
 
 })();
+
+
+
 
 
 

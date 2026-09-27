@@ -379,6 +379,16 @@ tr.row-sc:hover td{background:#EFF4FA}
 .tk-body{padding:0 16px 14px;border-top:1px solid var(--line)}
 .tk-body .act-g{margin-top:0;border-top:0}
 
+/* ── 로스터리 심층 패널 ─────────────────── */
+.rp{margin-top:22px;padding-top:20px;border-top:2px solid var(--ink)}
+.rp-h{font-size:15px;font-weight:800;margin:30px 0 8px;padding-left:12px;
+  border-left:4px solid var(--navy);line-height:1.35;letter-spacing:-.015em}
+.rp-h:first-child{margin-top:0}
+.rp-h4{font-size:13px;font-weight:800;margin:20px 0 7px;color:var(--ink2)}
+.rp .fx-block{font-size:13px}
+.rp table{font-size:12.5px}
+.rp .banner{font-size:12.5px}
+
 /* ── 관리회계 3기준 비교 ─────────────────── */
 .ma-cmp{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin:0 0 14px}
 .ma-cmp>span{background:rgba(255,255,255,.72);border-radius:8px;padding:11px 13px;
