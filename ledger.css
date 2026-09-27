@@ -385,6 +385,12 @@ tr.row-sc:hover td{background:#EFF4FA}
   border-left:4px solid var(--navy);line-height:1.35;letter-spacing:-.015em}
 .rp-h:first-child{margin-top:0}
 .rp-h4{font-size:13px;font-weight:800;margin:20px 0 7px;color:var(--ink2)}
+.rp-h5{font-size:12px;font-weight:800;margin:16px 0 6px;color:var(--navy);
+  text-transform:none;letter-spacing:-.01em}
+.rp-h5:before{content:"";display:inline-block;width:3px;height:11px;margin-right:7px;
+  background:var(--navy);vertical-align:-1px;border-radius:2px}
+.rp .linebox{margin-top:2px}
+.rp .chart-legend{margin-top:8px}
 .rp .fx-block{font-size:13px}
 .rp table{font-size:12.5px}
 .rp .banner{font-size:12.5px}

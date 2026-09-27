@@ -633,6 +633,19 @@ function bizOpSeries(s) {
 }
 
 /* ── 제품(로스터리) 심층 패널 ─────────────── */
+/* 로스터리 월별 3기준 — 매출(rev) / 영업손익(op) */
+function rstMthSeries(kind) {
+  var M = LX.rstPanel.mth, rev = kind === "rev";
+  return [
+    { name: "① 재무회계 (현행 장부)", color: "#9AA4AE", thin: true,
+      data: rev ? M.fin : M.finOp },
+    { name: "[A] 관리회계 — markup 23.56%", color: "#1E3A5F",
+      data: rev ? M.a : M.aOp },
+    { name: "[B] 관리회계 — 마진 0", color: "#2E8B74",
+      data: rev ? M.b : M.bOp }
+  ];
+}
+
 function rstPanelBlock() {
   var P = LX.rstPanel; if (!P) return "";
   var T = function (head, rows, opt) {
@@ -693,6 +706,20 @@ function rstPanelBlock() {
     (P.m0Note ? '<p class="small muted" style="margin:10px 0 0">' + P.m0Note + "</p>" : "") +
     '<div class="banner b-green" style="margin:14px 0 0"><b>건강한 사업입니다</b>' + P.m1After + "</div>" +
     (P.m1Scope ? '<div class="banner b-amber" style="margin:12px 0 0"><b>이 장표의 적용 범위</b>' + P.m1Scope + "</div>" : "");
+
+  /* ④-2 월별 3기준 겹쳐 보기 */
+  if (P.mth) {
+    h += '<h4 class="rp-h4">' + esc(P.mth.t) + "</h4>" +
+      '<p class="sec-d">' + P.mth.d + "</p>" +
+      '<h5 class="rp-h5">' + esc(P.mth.revT) + "</h5>" +
+      lineBox("rstMthR", rstMthSeries("rev"), null, 250) +
+      '<h5 class="rp-h5">' + esc(P.mth.opT) + "</h5>" +
+      lineBox("rstMthO", rstMthSeries("op"), P.mth.how, 250) +
+      '<div class="banner b-green" style="margin:14px 0 0"><b>읽는 방법만 바뀌었습니다</b>' +
+      P.mth.after + "</div>" +
+      '<div class="banner b-amber" style="margin:12px 0 0"><b>④표와 숫자가 다른 이유</b>' +
+      P.mth.gap + "</div>";
+  }
 
   /* ⑤ B2B */
   h += '<h3 class="rp-h">' + esc(P.b2bT) + "</h3>" +
@@ -896,6 +923,11 @@ function pBizAfter() {
     line("bo_" + s.key, bizOpSeries(s), M, { h: 230, split: 7, notes: N[s.key] });
   });
   if (LX.perStore) line("psA", psSeries(), M.slice(0, 8), { h: 300 });
+  if (LX.rstPanel && LX.rstPanel.mth) {
+    var RN = LX.rstPanel.mth.notes, M8 = M.slice(0, 8);
+    line("rstMthR", rstMthSeries("rev"), M8, { h: 250, notes: RN });
+    line("rstMthO", rstMthSeries("op"), M8, { h: 250, notes: RN });
+  }
 }
 
 /* ══ ② CSF · KPI ═══════════════════════════ */
