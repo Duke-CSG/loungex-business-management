@@ -247,6 +247,18 @@ function line(id, series, labels, opt) {
     x.fillStyle = "#f4f5f6";
     x.fillRect(px(opt.split), T, W - R - px(opt.split), ph);
   }
+  /* 0선 위·아래 음영 — 흑자 구간과 적자 구간을 눈으로 가릅니다 */
+  var hasNeg = false;
+  all.forEach(function (v) { if (v < 0) hasNeg = true; });
+  var zOn = hasNeg && mn < 0 && mx > 0;
+  var zBand = !!opt.zeroBand && zOn;
+  if (zBand) {
+    var zy0 = py(0);
+    x.fillStyle = "rgba(46,139,116,.075)";
+    x.fillRect(L, T, W - R - L, zy0 - T);
+    x.fillStyle = "rgba(192,57,43,.075)";
+    x.fillRect(L, zy0, W - R - L, T + ph - zy0);
+  }
   /* 격자 + y축 */
   x.font = "10.5px " + (opt.font || "system-ui, sans-serif");
   x.textBaseline = "middle";
@@ -266,6 +278,24 @@ function line(id, series, labels, opt) {
     if (i % step) return;
     x.fillText(lb, px(i), T + ph + 8);
   });
+
+  /* 0선 — 격자와 별개로 항상 굵게 긋습니다 */
+  if (zOn) {
+    var zy = py(0);
+    x.beginPath(); x.moveTo(L, zy); x.lineTo(W - R, zy);
+    x.strokeStyle = "#1A1A1A"; x.lineWidth = 1.5;
+    if (x.setLineDash) x.setLineDash([]);
+    x.stroke();
+    x.font = "bold 10.5px " + (opt.font || "system-ui, sans-serif");
+    x.textAlign = "right"; x.textBaseline = "middle";
+    x.fillStyle = "#1A1A1A"; x.fillText("0", L - 8, zy);
+    if (zBand) {
+      x.textAlign = "left";
+      x.fillStyle = "rgba(26,102,84,.92)"; x.fillText("흑자", L + 7, zy - 11);
+      x.fillStyle = "rgba(168,45,34,.92)"; x.fillText("적자", L + 7, zy + 12);
+    }
+    x.font = "10.5px " + (opt.font || "system-ui, sans-serif");
+  }
 
   /* 선 그리기 — 구간별로 실선/점선을 나눕니다 */
   function stroke(s, from, to, dashed) {
@@ -714,7 +744,8 @@ function rstPanelBlock() {
       '<h5 class="rp-h5">' + esc(P.mth.revT) + "</h5>" +
       lineBox("rstMthR", rstMthSeries("rev"), null, 250) +
       '<h5 class="rp-h5">' + esc(P.mth.opT) + "</h5>" +
-      lineBox("rstMthO", rstMthSeries("op"), P.mth.how, 250) +
+      (P.mth.opD ? '<p class="sec-d">' + P.mth.opD + "</p>" : "") +
+      lineBox("rstMthO", rstMthSeries("op"), P.mth.how, 290) +
       '<div class="banner b-green" style="margin:14px 0 0"><b>읽는 방법만 바뀌었습니다</b>' +
       P.mth.after + "</div>" +
       '<div class="banner b-amber" style="margin:12px 0 0"><b>④표와 숫자가 다른 이유</b>' +
@@ -926,7 +957,7 @@ function pBizAfter() {
   if (LX.rstPanel && LX.rstPanel.mth) {
     var RN = LX.rstPanel.mth.notes, M8 = M.slice(0, 8);
     line("rstMthR", rstMthSeries("rev"), M8, { h: 250, notes: RN });
-    line("rstMthO", rstMthSeries("op"), M8, { h: 250, notes: RN });
+    line("rstMthO", rstMthSeries("op"), M8, { h: 290, notes: RN, zeroBand: true });
   }
 }
 
