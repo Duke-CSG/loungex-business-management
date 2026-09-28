@@ -699,34 +699,54 @@ function rstPanelBlock() {
       }).join("") + "</tbody></table></div>";
   };
 
+  var tog = function (title, body, open) {
+    return '<details class="rp-d"' + (open ? " open" : "") + "><summary>" +
+      esc(title) + "</summary><div class=\"rp-dc\">" + body + "</div></details>";
+  };
+
   var h = '<div class="rp">';
 
-  /* ① 재무회계 */
-  h += '<h3 class="rp-h">' + esc(P.finT) + "</h3>" +
+  /* ── 대시보드: 한 화면에서 비교 ───────────────── */
+  h += '<h3 class="rp-h">' + esc(P.dashT) + "</h3>" +
+    '<p class="sec-d">' + P.dashD + "</p>";
+
+  h += '<div class="kpis rp-k">' + P.kpi.map(function (k) {
+    return '<div class="kpi' + (k.cls ? " " + k.cls : "") + '"><div class="k-l">' + esc(k.l) +
+      '</div><div class="k-v">' + esc(k.v) + '</div><div class="k-s">' + esc(k.s) + "</div></div>";
+  }).join("") + "</div>";
+
+  h += '<div class="rp-grid">' +
+    '<div class="rp-c"><h5 class="rp-h5">' + esc(P.mth.revT) + "</h5>" +
+    lineBox("rstMthR", rstMthSeries("rev"), null, 260) + "</div>" +
+    '<div class="rp-c"><h5 class="rp-h5">' + esc(P.mth.opT) + "</h5>" +
+    lineBox("rstMthO", rstMthSeries("op"), null, 260) + "</div></div>";
+
+  h += '<div class="banner b-green rp-b">' + P.dashAfter + "</div>";
+
+  /* ── 상세: 필요할 때 펼칩니다 ──────────────────── */
+  h += '<p class="rp-tt">아래는 근거와 해설입니다. 제목을 누르면 펼쳐집니다.</p><div class="rp-togs">';
+
+  h += tog("① 현행 장부 그대로 — 재무회계 월평균",
     '<p class="sec-d">' + esc(P.finD) + "</p>" +
     T(P.finHead, P.fin, { num: [1, 2] }) +
-    '<p class="small muted" style="margin:10px 0 0">' + esc(P.finNote) + "</p>";
+    '<p class="small muted" style="margin:10px 0 0">' + esc(P.finNote) + "</p>");
 
-  /* ② 착시 */
-  h += '<h3 class="rp-h">' + esc(P.illT) + "</h3>" +
+  h += tog("② 그런데 이 적자는 착시입니다",
     T(["항목", "값", "설명"], P.ill, { num: [1], smallFrom: 2 }) +
-    '<div class="banner b-green" style="margin:14px 0 0"><b>적자의 정체</b>' + P.illAfter + "</div>";
+    '<div class="banner b-green" style="margin:14px 0 0"><b>적자의 정체</b>' + P.illAfter + "</div>");
 
-  /* 용어 정의 */
   if (P.defs) {
-    h += '<h3 class="rp-h">' + esc(P.defsT) + "</h3>" +
-      '<p class="sec-d">' + esc(P.defsD) + "</p>" + defBox(P.defs);
+    h += tog("③ 처음 나오는 용어 — 정의와 계산식 6가지",
+      '<p class="sec-d">' + esc(P.defsD) + "</p>" + defBox(P.defs));
   }
 
-  /* ③ 이전가격 */
-  h += '<h3 class="rp-h">' + esc(P.maT) + "</h3>" +
+  h += tog("④ 이전가격은 어떻게 정했나 — 원가가산법",
     '<p class="sec-d">' + esc(P.maD) + "</p>" +
     '<p class="fx-block">' + esc(P.maFx) + "</p>" +
     T(["단계", "값", "산출"], P.maSteps, { smallFrom: 2 }) +
-    (P.maTwo ? '<div class="banner b-amber" style="margin:14px 0 0"><b>두 버전을 함께 씁니다</b>' + P.maTwo + "</div>" : "");
+    (P.maTwo ? '<div class="banner b-amber" style="margin:14px 0 0"><b>두 버전을 함께 씁니다</b>' + P.maTwo + "</div>" : ""));
 
-  /* ④ 기준1 */
-  h += '<h3 class="rp-h">' + esc(P.m1T) + "</h3>" +
+  h += tog("⑤ 두 버전 손익계산서 — [A] markup 23.56% / [B] 마진 0",
     '<p class="sec-d">' + P.m1D + "</p>" +
     T(P.m1Head, P.m1, { num: [1, 2, 3] }) +
     '<h4 class="rp-h4">' + esc(P.m1Item.t) + "</h4>" +
@@ -735,47 +755,34 @@ function rstPanelBlock() {
       T(P.m0Item.head, P.m0Item.rows, { num: [1, 2, 3, 4] }) : "") +
     (P.m0Note ? '<p class="small muted" style="margin:10px 0 0">' + P.m0Note + "</p>" : "") +
     '<div class="banner b-green" style="margin:14px 0 0"><b>건강한 사업입니다</b>' + P.m1After + "</div>" +
-    (P.m1Scope ? '<div class="banner b-amber" style="margin:12px 0 0"><b>이 장표의 적용 범위</b>' + P.m1Scope + "</div>" : "");
+    (P.m1Scope ? '<div class="banner b-amber" style="margin:12px 0 0"><b>이 장표의 적용 범위</b>' + P.m1Scope + "</div>" : ""));
 
-  /* ④-2 월별 3기준 겹쳐 보기 */
-  if (P.mth) {
-    h += '<h4 class="rp-h4">' + esc(P.mth.t) + "</h4>" +
-      '<p class="sec-d">' + P.mth.d + "</p>" +
-      '<h5 class="rp-h5">' + esc(P.mth.revT) + "</h5>" +
-      lineBox("rstMthR", rstMthSeries("rev"), null, 250) +
-      '<h5 class="rp-h5">' + esc(P.mth.opT) + "</h5>" +
-      (P.mth.opD ? '<p class="sec-d">' + P.mth.opD + "</p>" : "") +
-      lineBox("rstMthO", rstMthSeries("op"), P.mth.how, 290) +
-      '<div class="banner b-green" style="margin:14px 0 0"><b>읽는 방법만 바뀌었습니다</b>' +
-      P.mth.after + "</div>" +
-      '<div class="banner b-amber" style="margin:12px 0 0"><b>④표와 숫자가 다른 이유</b>' +
-      P.mth.gap + "</div>";
-  }
+  h += tog("⑥ 위 두 차트는 어떻게 계산했나",
+    (P.mth.opD ? '<p class="sec-d">' + P.mth.opD + "</p>" : "") +
+    '<p class="fx-block">' + esc(P.mth.how) + "</p>" +
+    '<div class="banner b-amber" style="margin:14px 0 0"><b>⑤표와 숫자가 다른 이유</b>' + P.mth.gap + "</div>");
 
-  /* ⑤ B2B */
-  h += '<h3 class="rp-h">' + esc(P.b2bT) + "</h3>" +
+  h += tog("⑦ B2B가 늘면 이익률은 더 좋아집니다",
     '<p class="sec-d">' + P.b2bD + "</p>" +
     T(P.b2bHead, P.b2b, { num: [1, 2, 3, 4, 5] }) +
-    '<div class="banner b-blue" style="margin:14px 0 0">' + P.b2bAfter + "</div>";
+    '<div class="banner b-blue" style="margin:14px 0 0">' + P.b2bAfter + "</div>");
 
-  /* ⑥ 레버 */
-  h += '<h3 class="rp-h">' + esc(P.levT) + "</h3>" +
+  h += tog("⑧ 개선 레버 8개 — 숫자로 본 순서",
     '<p class="sec-d">' + esc(P.levD) + "</p>" +
     T(P.levHead, P.lev, { num: [2, 3], smallFrom: 4 }) +
-    '<div class="banner b-amber" style="margin:14px 0 0"><b>순서가 분명합니다</b>' + P.levAfter + "</div>";
+    '<div class="banner b-amber" style="margin:14px 0 0"><b>순서가 분명합니다</b>' + P.levAfter + "</div>");
 
-  /* ⑦ 확장 */
-  h += '<h3 class="rp-h">' + esc(P.expT) + "</h3>" +
+  h += tog("⑨ 확장 이전 의사결정 — 거꾸로 읽습니다",
     '<p class="sec-d">' + P.expD + "</p>" +
     '<p class="fx-block">' + esc(P.expFx) + "</p>" +
     T(P.expHead, P.exp, { num: [1, 2, 3], smallFrom: 4 }) +
-    '<div class="banner b-blue" style="margin:14px 0 0"><b>거꾸로 읽습니다</b>' + P.expAfter + "</div>";
+    '<div class="banner b-blue" style="margin:14px 0 0"><b>거꾸로 읽습니다</b>' + P.expAfter + "</div>");
 
-  /* ⑧ 점검 */
-  h += '<h3 class="rp-h">' + esc(P.chkT) + "</h3>" +
+  h += tog("⑩ 점검 과제 9건 — 이 모델은 완전하지 않습니다",
     T(P.chkHead, P.chk, { num: [0], smallFrom: 2 }) +
-    '<div class="banner b-red" style="margin:14px 0 0"><b>1번이 먼저입니다</b>' + P.chkAfter + "</div>";
+    '<div class="banner b-red" style="margin:14px 0 0"><b>1번이 먼저입니다</b>' + P.chkAfter + "</div>");
 
+  h += "</div>";
   return h + "</div>";
 }
 
@@ -1897,9 +1904,9 @@ function pTasks() {
 
   /* 사업영역별 커버리지 — 과제가 한쪽에 몰려 있는지 봅니다 */
   var COV = [
-    { n: "유인직영", m: "매장운영", rev: 1242067956, op: 62515184 },
+    { n: "유인직영", m: "매장운영", rev: 1242067956, op: 59642090 },
     { n: "무인직영", m: "매장운영", rev: 218017040, op: -150721602 },
-    { n: "투자모델", m: "매장운영", rev: 450108151, op: -135751262 },
+    { n: "투자모델", m: "매장운영", rev: 450108151, op: -130886599 },
     { n: "상품", m: "식자재유통", rev: 186976086, op: 45131317 },
     { n: "제품", m: "식자재유통", rev: 121422998, op: -24575187 },
     { n: "전사 · 본부", m: "공통", rev: 0, op: 0 }

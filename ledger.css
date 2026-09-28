@@ -395,6 +395,31 @@ tr.row-sc:hover td{background:#EFF4FA}
 .rp table{font-size:12.5px}
 .rp .banner{font-size:12.5px}
 
+/* 대시보드 — 두 차트를 한 화면에 나란히 */
+.rp-k{margin:14px 0 18px}
+.rp-grid{display:grid;grid-template-columns:1fr 1fr;gap:20px;align-items:start}
+.rp-c{min-width:0}
+.rp-c .rp-h5{margin-top:0}
+.rp-b{margin:16px 0 0}
+@media(max-width:900px){.rp-grid{grid-template-columns:1fr;gap:12px}}
+
+/* 접이식 상세 */
+.rp-tt{font-size:12px;color:var(--mid);margin:24px 0 2px;font-weight:600}
+.rp-togs{border-top:1px solid var(--line2)}
+.rp-d{border-bottom:1px solid var(--line)}
+.rp-d>summary{list-style:none;cursor:pointer;padding:13px 4px 13px 28px;position:relative;
+  font-size:13px;font-weight:700;color:var(--ink);letter-spacing:-.01em}
+.rp-d>summary::-webkit-details-marker{display:none}
+.rp-d>summary::marker{content:""}
+.rp-d>summary:before{content:"▸";position:absolute;left:7px;top:13px;color:var(--navy);
+  font-size:12px;display:inline-block;transition:transform .15s ease}
+.rp-d[open]>summary:before{transform:rotate(90deg)}
+.rp-d>summary:hover{background:var(--panel)}
+.rp-d[open]>summary{color:var(--navy);background:var(--navy-lt)}
+.rp-dc{padding:6px 4px 20px 28px}
+.rp-dc>.sec-d:first-child{margin-top:0}
+@media(max-width:600px){.rp-dc{padding-left:10px}}
+
 /* ── 관리회계 3기준 비교 ─────────────────── */
 .ma-cmp{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin:0 0 14px}
 .ma-cmp>span{background:rgba(255,255,255,.72);border-radius:8px;padding:11px 13px;
