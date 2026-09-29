@@ -403,22 +403,49 @@ tr.row-sc:hover td{background:#EFF4FA}
 .rp-b{margin:16px 0 0}
 @media(max-width:900px){.rp-grid{grid-template-columns:1fr;gap:12px}}
 
-/* 접이식 상세 */
-.rp-tt{font-size:12px;color:var(--mid);margin:24px 0 2px;font-weight:600}
-.rp-togs{border-top:1px solid var(--line2)}
-.rp-d{border-bottom:1px solid var(--line)}
-.rp-d>summary{list-style:none;cursor:pointer;padding:13px 4px 13px 28px;position:relative;
-  font-size:13px;font-weight:700;color:var(--ink);letter-spacing:-.01em}
-.rp-d>summary::-webkit-details-marker{display:none}
-.rp-d>summary::marker{content:""}
-.rp-d>summary:before{content:"▸";position:absolute;left:7px;top:13px;color:var(--navy);
-  font-size:12px;display:inline-block;transition:transform .15s ease}
-.rp-d[open]>summary:before{transform:rotate(90deg)}
-.rp-d>summary:hover{background:var(--panel)}
-.rp-d[open]>summary{color:var(--navy);background:var(--navy-lt)}
-.rp-dc{padding:6px 4px 20px 28px}
-.rp-dc>.sec-d:first-child{margin-top:0}
-@media(max-width:600px){.rp-dc{padding-left:10px}}
+/* ══ 페이지 문법 — 리드문 · 접이식 상세 ══════════════ */
+.lede{font-size:15.5px;line-height:1.64;font-weight:600;color:var(--ink);
+  margin:0 0 7px;letter-spacing:-.018em}
+.lede b{color:var(--navy)}
+.lede-s{font-size:12.5px;line-height:1.62;color:var(--mid);margin:0 0 4px}
+.lede+.kpis,.lede-s+.kpis{margin-top:16px}
+.sec-h{font-size:14px;font-weight:800;margin:26px 0 8px;padding-left:11px;
+  border-left:4px solid var(--navy);line-height:1.35;letter-spacing:-.015em}
+.sec-h:first-child{margin-top:4px}
+
+.tgs-h{font-size:12px;color:var(--mid);margin:26px 0 2px;font-weight:600}
+.tgs{border-top:1px solid var(--line2)}
+.tg,.rp-d{border-bottom:1px solid var(--line)}
+.tg>summary,.rp-d>summary{list-style:none;cursor:pointer;padding:13px 4px 13px 28px;
+  position:relative;font-size:13px;font-weight:700;color:var(--ink);letter-spacing:-.01em}
+.tg>summary::-webkit-details-marker,.rp-d>summary::-webkit-details-marker{display:none}
+.tg>summary::marker,.rp-d>summary::marker{content:""}
+.tg>summary:before,.rp-d>summary:before{content:"▸";position:absolute;left:7px;top:13px;
+  color:var(--navy);font-size:12px;display:inline-block;transition:transform .15s ease}
+.tg[open]>summary:before,.rp-d[open]>summary:before{transform:rotate(90deg)}
+.tg>summary:hover,.rp-d>summary:hover{background:var(--panel)}
+.tg[open]>summary,.rp-d[open]>summary{color:var(--navy);background:var(--navy-lt)}
+.tg-c,.rp-dc{padding:8px 4px 20px 28px}
+.tg-c>.sec-d:first-child,.rp-dc>.sec-d:first-child{margin-top:0}
+.tg-c>.card,.tg-c>.card:first-child{margin:0 0 14px;border:0;box-shadow:none;padding:0}
+.tg-c>.card>h2{font-size:13px;margin:0 0 6px}
+.tg-c>.card:last-child{margin-bottom:0}
+@media(max-width:600px){.tg-c,.rp-dc{padding-left:10px}}
+
+/* 카드·진단블록 안에 단독으로 놓인 토글 */
+.csf>.tg,.dx-body>.tgs{margin-top:2px}
+.csf>.tg{border-top:1px solid var(--line);border-bottom:0;background:var(--panel)}
+.csf>.tg>summary{padding:10px 4px 10px 26px;font-size:12.5px;color:var(--mid)}
+.csf>.tg>summary:before{top:10px}
+.csf>.tg[open]>summary{background:transparent;color:var(--navy)}
+.csf>.tg .tg-c{padding:0 14px 14px 26px}
+.dx-body>.tgs{border-top:1px solid var(--line2);margin-top:16px}
+.dx-body>.tgs-h{margin:18px 0 0}
+/* 토글 안에서는 카드 테두리를 걷어냅니다 */
+.tg-c .card{margin:0 0 14px;border:0;box-shadow:none;padding:0;background:transparent}
+.tg-c .card>h2{font-size:13px;margin:0 0 6px;padding:0;border:0}
+.tg-c .card:last-child{margin-bottom:0}
+.tg-c .banner:last-child{margin-bottom:0}
 
 /* ── 관리회계 3기준 비교 ─────────────────── */
 .ma-cmp{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin:0 0 14px}
